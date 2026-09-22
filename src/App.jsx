@@ -14,11 +14,11 @@ import {
 } from './utils/storage';
 
 import { 
-  isFirebaseConfigured, 
-  subscribeToQuestionSets, 
-  saveQuestionSetToCloud, 
-  deleteQuestionSetFromCloud
-} from './services/firebase';
+  fetchQuestionSetsFromVercel, 
+  saveQuestionSetToVercel, 
+  deleteQuestionSetFromVercel,
+  uploadAllSetsToVercel 
+} from './services/vercelKv';
 
 import { useAudioSFX } from './hooks/useAudioSFX';
 import { usePoseDetection } from './hooks/usePoseDetection';
@@ -39,9 +39,9 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home'); // 'home' | 'manager' | 'calibration' | 'game' | 'final'
   const [finalData, setFinalData] = useState(null);
 
-  // Cloud Sync State
-  const [isCloudConfigured, setIsCloudConfigured] = useState(isFirebaseConfigured);
-  const [cloudStatus, setCloudStatus] = useState(() => isFirebaseConfigured() ? 'syncing' : 'unconfigured');
+  // Vercel KV Cloud Sync State
+  const [isCloudConfigured, setIsCloudConfigured] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState('checking'); // 'connected' | 'syncing' | 'offline' | 'unconfigured'
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -51,39 +51,36 @@ export default function App() {
   // Sound Engine
   const audioSFX = useAudioSFX(settings.soundEnabled);
 
-  // Real-time Firebase Firestore synchronization
-  useEffect(() => {
-    const configured = isFirebaseConfigured();
-    setIsCloudConfigured(configured);
-
-    if (!configured) {
-      setCloudStatus('unconfigured');
-      return;
-    }
-
+  // Sync with Vercel KV Serverless API on load
+  const syncWithVercel = async () => {
     setCloudStatus('syncing');
-
-    const unsubscribe = subscribeToQuestionSets(
-      (cloudSets) => {
+    try {
+      const res = await fetchQuestionSetsFromVercel();
+      if (res && res.success && res.configured) {
+        setIsCloudConfigured(true);
         setCloudStatus('connected');
-        if (cloudSets && cloudSets.length > 0) {
+        if (Array.isArray(res.data) && res.data.length > 0) {
           setSets((prevSets) => {
-            const merged = mergeLocalAndCloudSets(prevSets, cloudSets);
+            const merged = mergeLocalAndCloudSets(prevSets, res.data);
             saveQuestionSets(merged);
             return merged;
           });
         }
-      },
-      (err) => {
-        console.warn("Firestore subscription error", err);
+      } else if (res && res.configured === false) {
+        setIsCloudConfigured(false);
+        setCloudStatus('unconfigured');
+      } else {
         setCloudStatus('offline');
       }
-    );
+    } catch (e) {
+      console.warn("Vercel sync error", e);
+      setCloudStatus('offline');
+    }
+  };
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [isCloudConfigured]);
+  useEffect(() => {
+    syncWithVercel();
+  }, []);
 
   // Pose & Crowd Detection Hook (Always persistent)
   const {
@@ -102,37 +99,31 @@ export default function App() {
     isActive: true
   });
 
-  // Save changes to localStorage AND sync to Firebase Firestore
+  // Save changes to localStorage AND sync to Vercel KV if available
   const handleUpdateSets = async (newSets, modifiedSet = null, deletedSetId = null) => {
     setSets(newSets);
     saveQuestionSets(newSets);
 
-    if (isFirebaseConfigured()) {
+    if (cloudStatus === 'connected' || isCloudConfigured) {
       setCloudStatus('syncing');
       try {
         if (deletedSetId) {
-          await deleteQuestionSetFromCloud(deletedSetId);
+          await deleteQuestionSetFromVercel(deletedSetId);
         } else if (modifiedSet) {
-          await saveQuestionSetToCloud(modifiedSet);
+          await saveQuestionSetToVercel(modifiedSet);
         } else {
-          // If a general update occurred (e.g. reorder or import), sync the active set
-          const current = newSets.find(s => s.id === activeSetId) || newSets[0];
-          if (current) {
-            await saveQuestionSetToCloud(current);
-          }
+          await uploadAllSetsToVercel(newSets);
         }
         setCloudStatus('connected');
       } catch (err) {
-        console.error("Cloud sync failed on updateSets", err);
+        console.warn("Vercel KV sync failed", err);
         setCloudStatus('offline');
       }
     }
   };
 
   const handleCloudConfigChange = () => {
-    const configured = isFirebaseConfigured();
-    setIsCloudConfigured(configured);
-    setCloudStatus(configured ? 'syncing' : 'unconfigured');
+    syncWithVercel();
   };
 
   const handleSelectSet = (id) => {

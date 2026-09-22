@@ -7,11 +7,9 @@ import {
 } from 'lucide-react';
 import { exportSetToJson, parseImportedJson } from '../utils/storage';
 import { 
-  getFirebaseConfig, 
-  saveFirebaseConfig, 
-  removeFirebaseConfig, 
-  uploadAllSetsToCloud 
-} from '../services/firebase';
+  uploadAllSetsToVercel, 
+  fetchQuestionSetsFromVercel 
+} from '../services/vercelKv';
 
 export const CHATGPT_PROMPT_TEMPLATE = `Kamu adalah asisten guru yang ahli membuat kuis interaktif untuk siswa sekolah dasar.
 Tolong buatkan set soal kuis pilihan ganda 2 opsi (A dan B) untuk permainan gerak "Lompat Pilih" PID dengan topik: [TULIS TOPIK/MATERI DI SINI, contoh: Rantai Makanan Kelas 5 SD].
@@ -62,14 +60,13 @@ export function QuestionManager({
   const [pasteText, setPasteText] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
-  // Cloud Firebase modal state
+  // Cloud Database modal state (Vercel KV)
   const [showCloudModal, setShowCloudModal] = useState(false);
-  const [cloudConfigInput, setCloudConfigInput] = useState('');
   const [cloudModalMsg, setCloudModalMsg] = useState(null);
   const [isUploadingAll, setIsUploadingAll] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(false);
 
   const activeSet = sets.find(s => s.id === currentSetId) || sets[0];
-  const currentConfig = getFirebaseConfig();
 
   // Helper to update current active set and trigger sync
   const updateCurrentSet = (updatedFields) => {
@@ -142,40 +139,25 @@ export function QuestionManager({
     onSelectSet(duplicatedId);
   };
 
-  // Firebase Cloud Operations
-  const handleSaveFirebaseConfig = () => {
+  // Vercel KV Cloud Operations
+  const handleCheckConnection = async () => {
+    setIsCheckingConnection(true);
+    setCloudModalMsg(null);
     try {
-      setCloudModalMsg(null);
-      let text = cloudConfigInput.trim();
-      let parsed = null;
-
-      if (text.includes('{')) {
-        const start = text.indexOf('{');
-        const end = text.lastIndexOf('}');
-        if (start !== -1 && end !== -1) {
-          const jsonish = text.substring(start, end + 1);
-          try {
-            parsed = JSON.parse(jsonish);
-          } catch (e) {
-            const clean = jsonish
-              .replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":')
-              .replace(/'/g, '"')
-              .replace(/,\s*}/g, '}');
-            parsed = JSON.parse(clean);
-          }
-        }
+      const res = await fetchQuestionSetsFromVercel();
+      if (res && res.configured) {
+        setCloudModalMsg({ type: 'success', text: 'Koneksi Vercel KV aktif dan berhasil terhubung!' });
+      } else {
+        setCloudModalMsg({ 
+          type: 'info', 
+          text: 'Vercel KV belum terdeteksi. Pastikan database KV sudah di-connect ke project di Dashboard Vercel.' 
+        });
       }
-
-      if (!parsed || !parsed.apiKey || !parsed.projectId) {
-        throw new Error("Format konfigurasi tidak sesuai. Pastikan ada 'apiKey' dan 'projectId'.");
-      }
-
-      saveFirebaseConfig(parsed);
       if (onCloudConfigChange) onCloudConfigChange();
-      setCloudModalMsg({ type: 'success', text: `Berhasil terhubung ke Firebase Project "${parsed.projectId}"!` });
-      setCloudConfigInput('');
     } catch (err) {
-      setCloudModalMsg({ type: 'error', text: err.message });
+      setCloudModalMsg({ type: 'error', text: 'Gagal mengecek koneksi: ' + err.message });
+    } finally {
+      setIsCheckingConnection(false);
     }
   };
 
@@ -183,20 +165,13 @@ export function QuestionManager({
     try {
       setIsUploadingAll(true);
       setCloudModalMsg(null);
-      await uploadAllSetsToCloud(sets);
-      setCloudModalMsg({ type: 'success', text: `Semua ${sets.length} set kuis berhasil disinkronkan ke Firestore online!` });
+      await uploadAllSetsToVercel(sets);
+      setCloudModalMsg({ type: 'success', text: `Semua ${sets.length} set kuis berhasil disinkronkan ke Vercel KV online!` });
+      if (onCloudConfigChange) onCloudConfigChange();
     } catch (err) {
-      setCloudModalMsg({ type: 'error', text: 'Gagal mengunggah ke Firebase: ' + err.message });
+      setCloudModalMsg({ type: 'error', text: 'Gagal mengunggah ke Vercel KV: ' + err.message });
     } finally {
       setIsUploadingAll(false);
-    }
-  };
-
-  const handleDisconnectFirebase = () => {
-    if (confirm("Yakin ingin memutuskan koneksi Firebase? Bank soal akan kembali menggunakan penyimpanan lokal di browser ini.")) {
-      removeFirebaseConfig();
-      if (onCloudConfigChange) onCloudConfigChange();
-      setCloudModalMsg({ type: 'info', text: 'Koneksi Firebase diputuskan. Berjalan dalam mode lokal (offline).' });
     }
   };
 
@@ -334,7 +309,7 @@ export function QuestionManager({
                   ? 'bg-rose-950/80 border-rose-500/60 text-rose-300'
                   : 'bg-slate-800 border-slate-700 text-sky-400 hover:bg-slate-700'
               }`}
-              title="Database Cloud Firebase — Klik untuk Pengaturan"
+              title="Database Cloud Vercel KV — Klik untuk Pengaturan"
             >
               <Cloud size={15} />
             </button>
@@ -450,10 +425,10 @@ export function QuestionManager({
               cloudStatus === 'offline' ? 'bg-rose-400' : 'bg-slate-500'
             }`} />
             <span>
-              {cloudStatus === 'connected' && `Tersambung ke Database Firebase (${currentConfig?.projectId || 'Online'}) • Setiap soal otomatis tersimpan online.`}
-              {cloudStatus === 'syncing' && 'Menyinkronkan data soal ke Firebase Firestore online...'}
-              {cloudStatus === 'offline' && 'Koneksi ke Firebase terputus. Soal tersimpan di cache lokal browser ini.'}
-              {cloudStatus === 'unconfigured' && 'Database Cloud belum diatur. Soal saat ini tersimpan di browser ini (localStorage).'}
+              {cloudStatus === 'connected' && 'Tersambung ke Vercel KV Database (Serverless) • Setiap soal otomatis tersimpan online.'}
+              {cloudStatus === 'syncing' && 'Menyinkronkan data soal ke Vercel KV...'}
+              {cloudStatus === 'offline' && 'Mode Offline / Lokal. Soal tersimpan di cache lokal browser ini.'}
+              {cloudStatus === 'unconfigured' && 'Database Vercel KV belum terhubung. Soal tersimpan di browser ini (localStorage).'}
             </span>
           </div>
 
@@ -469,7 +444,7 @@ export function QuestionManager({
             }`}
           >
             <Database size={13} />
-            <span>{cloudStatus === 'connected' ? 'Kelola Cloud' : 'Hubungkan Firebase'}</span>
+            <span>{cloudStatus === 'connected' ? 'Kelola Vercel KV' : 'Database Vercel'}</span>
           </button>
         </div>
 
@@ -962,7 +937,7 @@ export function QuestionManager({
         </div>
       )}
 
-      {/* Firebase Database Configuration Modal */}
+      {/* Vercel KV Database Modal */}
       {showCloudModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl space-y-5 animate-fadeIn max-h-[90vh] overflow-y-auto">
@@ -972,8 +947,8 @@ export function QuestionManager({
                   <Database size={20} />
                 </div>
                 <div>
-                  <h3 className="font-black text-lg text-white">Database Online (Firebase Firestore)</h3>
-                  <p className="text-xs text-slate-400">Simpan dan sinkronkan bank soal ke cloud secara otomatis</p>
+                  <h3 className="font-black text-lg text-white">Database Online (Vercel KV Serverless)</h3>
+                  <p className="text-xs text-slate-400">Sinkronisasi bank soal otomatis tanpa perlu API key di sisi browser</p>
                 </div>
               </div>
               <button
@@ -1002,27 +977,28 @@ export function QuestionManager({
                 } />
                 <div>
                   <div className="font-bold">
-                    {cloudStatus === 'connected' ? 'Status: Terhubung ke Firebase' :
+                    {cloudStatus === 'connected' ? 'Status: Terhubung ke Vercel KV (Online)' :
                      cloudStatus === 'syncing' ? 'Status: Sedang Menyinkronkan...' :
-                     cloudStatus === 'offline' ? 'Status: Terputus dari Firebase' :
-                     'Status: Belum Terhubung ke Firebase'}
+                     cloudStatus === 'offline' ? 'Status: Mode Offline / Lokal' :
+                     'Status: Vercel KV Belum Aktif'}
                   </div>
                   <div className="text-xs opacity-80">
-                    {currentConfig
-                      ? `Project ID: ${currentConfig.projectId}`
-                      : 'Saat ini menggunakan penyimpanan lokal browser (localStorage).'}
+                    {cloudStatus === 'connected'
+                      ? 'Setiap perubahan soal otomatis tersimpan ke Vercel KV.'
+                      : 'Data soal saat ini tersimpan aman di browser ini (localStorage).'}
                   </div>
                 </div>
               </div>
 
-              {isCloudConfigured && (
-                <button
-                  onClick={handleDisconnectFirebase}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 text-slate-400 border border-slate-700 text-xs font-semibold transition"
-                >
-                  Putuskan
-                </button>
-              )}
+              <button
+                onClick={handleCheckConnection}
+                disabled={isCheckingConnection}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 text-xs font-semibold transition flex items-center gap-1.5"
+                title="Periksa ulang koneksi ke serverless API"
+              >
+                <RefreshCw size={13} className={isCheckingConnection ? 'animate-spin' : ''} />
+                <span>{isCheckingConnection ? 'Mengecek...' : 'Cek Status'}</span>
+              </button>
             </div>
 
             {/* Feedback Message */}
@@ -1039,64 +1015,47 @@ export function QuestionManager({
               </div>
             )}
 
-            {/* Upload All Local Sets to Cloud Button */}
-            {isCloudConfigured && (
-              <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/80 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-sm text-white">Sinkronkan Semua Soal ke Cloud</h4>
-                    <p className="text-xs text-slate-400">Unggah seluruh {sets.length} set soal lokal ke Firestore sekarang</p>
-                  </div>
-                  <button
-                    onClick={handleUploadAllToCloud}
-                    disabled={isUploadingAll}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-emerald-600/30"
-                  >
-                    <RefreshCw size={14} className={isUploadingAll ? 'animate-spin' : ''} />
-                    <span>{isUploadingAll ? 'Mengunggah...' : 'Unggah Sekarang'}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Configuration Form */}
-            <div className="space-y-3">
+            {/* Upload All Local Sets to Vercel KV */}
+            <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/80 space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                  {isCloudConfigured ? 'Perbarui Konfigurasi Firebase' : 'Masukkan Konfigurasi Firebase Web App'}
-                </label>
-                <span className="text-[11px] text-amber-400 font-semibold">Firebase Console → Project Settings</span>
+                <div>
+                  <h4 className="font-bold text-sm text-white">Sinkronkan Semua Soal Lokal ke Vercel KV</h4>
+                  <p className="text-xs text-slate-400">Unggah seluruh {sets.length} set kuis saat ini ke database online</p>
+                </div>
+                <button
+                  onClick={handleUploadAllToCloud}
+                  disabled={isUploadingAll}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-emerald-600/30"
+                >
+                  <RefreshCw size={14} className={isUploadingAll ? 'animate-spin' : ''} />
+                  <span>{isUploadingAll ? 'Mengunggah...' : 'Unggah Sekarang'}</span>
+                </button>
               </div>
+            </div>
 
-              <textarea
-                rows="6"
-                value={cloudConfigInput}
-                onChange={(e) => setCloudConfigInput(e.target.value)}
-                placeholder={`Tempel (Paste) objek konfigurasi dari Firebase Console di sini, contoh:\n{\n  apiKey: "AIzaSy...",\n  authDomain: "proyek-ku.firebaseapp.com",\n  projectId: "proyek-ku",\n  storageBucket: "proyek-ku.appspot.com",\n  messagingSenderId: "123456789",\n  appId: "1:12345:web:abcdef"\n}`}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-amber-400"
-              />
-
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                💡 <strong>Tips Cepat:</strong> Anda bisa langsung copy-paste cuplikan <code>const firebaseConfig = &#123; ... &#125;;</code> dari halaman Firebase Console. Sistem otomatis mendeteksi formatnya.
-              </p>
+            {/* Vercel KV Activation Instructions */}
+            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+              <div className="flex items-center gap-2 text-sky-400 font-bold text-xs">
+                <Server size={16} />
+                <span>Cara Mengaktifkan Database Vercel KV (Otomatis & Gratis):</span>
+              </div>
+              <ol className="space-y-2 text-xs text-slate-300 list-decimal list-inside leading-relaxed">
+                <li>Buka dashboard proyek Anda di <strong className="text-white">vercel.com</strong>.</li>
+                <li>Pilih tab <strong className="text-white">Storage</strong> lalu klik tombol <strong className="text-emerald-400">Create Database</strong>.</li>
+                <li>Pilih <strong className="text-white">KV</strong> (atau Upstash Redis) dan buat instance baru.</li>
+                <li>Klik <strong className="text-sky-400">Connect to Project</strong> lalu pilih project <code className="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">lompatjawab</code>.</li>
+                <li>Deploy ulang / buka web Anda. Game otomatis mendeteksi database tanpa perlu konfigurasi tambahan apa pun!</li>
+              </ol>
             </div>
 
             {/* Footer Buttons */}
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
               <button
                 onClick={() => setShowCloudModal(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition"
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition"
               >
                 Tutup
               </button>
-              {cloudConfigInput.trim() && (
-                <button
-                  onClick={handleSaveFirebaseConfig}
-                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition active:scale-95"
-                >
-                  Simpan & Hubungkan
-                </button>
-              )}
             </div>
           </div>
         </div>
