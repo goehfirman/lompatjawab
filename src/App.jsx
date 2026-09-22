@@ -48,7 +48,8 @@ export default function App() {
     switchCamera,
     startCamera,
     crowdDensity,
-    fps
+    fps,
+    stream
   } = usePoseDetection({
     videoRef,
     canvasRef,
@@ -174,6 +175,7 @@ export default function App() {
             onRequestCamera={() => startCamera(activeCameraId)}
             crowdDensity={crowdDensity}
             fps={fps}
+            stream={stream}
           />
         )}
 

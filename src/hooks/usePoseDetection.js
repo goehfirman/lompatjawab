@@ -14,6 +14,7 @@ export function usePoseDetection({
   const [cameraError, setCameraError] = useState(null);
   const [availableCameras, setAvailableCameras] = useState([]);
   const [activeCameraId, setActiveCameraId] = useState('');
+  const [cameraStream, setCameraStream] = useState(null);
   const [crowdDensity, setCrowdDensity] = useState({ pctA: 50, pctB: 50, dominantZone: 'TIE', activityLevel: 0 });
   const [fps, setFps] = useState(0);
 
@@ -42,6 +43,15 @@ export function usePoseDetection({
   const startCamera = useCallback(async (selectedDeviceId = '') => {
     try {
       setCameraError(null);
+
+      // Check secure context for local network HTTP
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (!window.isSecureContext && !isLocal) {
+        throw new Error(
+          "Kamera diblokir browser karena halaman dibuka via HTTP di jaringan (" + window.location.host + "). Untuk mengizinkan: Buka chrome://flags/#unsafely-treat-insecure-origin-as-secure di Chrome PID, masukkan " + window.location.origin + ", pilih Enabled, lalu Relaunch browser."
+        );
+      }
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("Browser tidak mendukung akses kamera (getUserMedia).");
       }
@@ -51,39 +61,78 @@ export function usePoseDetection({
         streamRef.current.getTracks().forEach(track => track.stop());
       }
 
-      const constraints = {
-        video: selectedDeviceId 
-          ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-          : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
-      };
+      let stream = null;
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Strategy 1: Ideal 720p without strict facingMode
+      try {
+        const constraints = {
+          video: selectedDeviceId 
+            ? { deviceId: { exact: selectedDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+            : { width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        };
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e1) {
+        console.warn("Strategy 1 failed, trying fallback with { video: true }...", e1);
+      }
+
+      // Strategy 2: Absolute generic { video: true }
+      if (!stream) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true,
+            audio: false
+          });
+        } catch (e2) {
+          console.warn("Strategy 2 failed, trying unconditional { video: true }...", e2);
+        }
+      }
+
+      // Strategy 3: Pure { video: true } with no deviceId
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+
       streamRef.current = stream;
+      setCameraStream(stream);
 
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = async () => {
+        const v = videoRef.current;
+        v.srcObject = stream;
+        v.muted = true;
+        v.playsInline = true;
+        v.setAttribute('playsinline', 'true');
+        v.setAttribute('webkit-playsinline', 'true');
+
+        const tryPlay = async () => {
           try {
-            await videoRef.current.play();
+            await v.play();
             setIsCameraReady(true);
             refreshCameraDevices();
-          } catch (err) {
-            console.warn("Video play error", err);
-            // Autoplay might need user click
+          } catch (playErr) {
+            console.warn("video.play() deferred:", playErr);
             setIsCameraReady(true);
           }
         };
+
+        if (v.readyState >= 2) {
+          tryPlay();
+        } else {
+          v.onloadedmetadata = tryPlay;
+          v.oncanplay = tryPlay;
+        }
       }
     } catch (err) {
       console.error("Camera access error:", err);
       setIsCameraReady(false);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setCameraError("Izin kamera belum diberikan. Klik tombol 'Izinkan Kamera' di atas.");
+        setCameraError("Izin kamera belum diberikan atau ditolak. Pastikan izin kamera telah diaktifkan di Pengaturan PID atau klik 'Izinkan' di browser.");
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        setCameraError("Tidak ada kamera yang terdeteksi di PID. Sambungkan webcam USB.");
+        setCameraError("Tidak ada kamera/webcam yang terdeteksi di perangkat PID ini. Sambungkan webcam USB.");
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setCameraError("Kamera sedang digunakan oleh aplikasi lain di PID. Tutup aplikasi lain terlebih dahulu.");
       } else {
-        setCameraError(`Gagal mengakses kamera: ${err.message || 'Periksa koneksi kamera'}`);
+        setCameraError(err.message || "Gagal mengakses kamera. Periksa koneksi kamera.");
       }
     }
   }, [videoRef, refreshCameraDevices]);
@@ -233,6 +282,7 @@ export function usePoseDetection({
     switchCamera,
     startCamera,
     crowdDensity,
-    fps
+    fps,
+    stream: cameraStream
   };
 }

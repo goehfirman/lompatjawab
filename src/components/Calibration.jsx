@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { 
   Users, ShieldAlert, Video, Play, AlertCircle, RefreshCw, 
   Flame, Sparkles, Footprints, Trophy, Camera 
@@ -13,7 +13,8 @@ export function Calibration({
   cameraError,
   onRequestCamera,
   crowdDensity,
-  fps
+  fps,
+  stream
 }) {
   const { 
     initialStudentsCount = 20, 
@@ -21,6 +22,15 @@ export function Calibration({
     motionMode = 'jump', 
     timerOverride 
   } = settings;
+
+  const calibVideoRef = useRef(null);
+
+  useEffect(() => {
+    if (calibVideoRef.current && stream) {
+      calibVideoRef.current.srcObject = stream;
+      calibVideoRef.current.play().catch(e => console.warn("calib video play deferred:", e));
+    }
+  }, [stream]);
 
   const handleStudentsCountChange = (count) => {
     onUpdateSettings({ ...settings, initialStudentsCount: Math.max(2, count) });
@@ -32,7 +42,7 @@ export function Calibration({
       <div className="flex-1 flex flex-col bg-slate-900/80 backdrop-blur border border-slate-800 rounded-3xl p-5 relative overflow-hidden">
         <div className="flex items-center justify-between mb-3 z-20">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-emerald-500 animate-ping" />
+            <span className={`w-3 h-3 rounded-full ${isCameraReady ? 'bg-emerald-500 animate-ping' : 'bg-rose-500'}`} />
             <h2 className="font-extrabold text-xl text-white">Area Kamera Seluruh Kelas</h2>
           </div>
 
@@ -42,6 +52,7 @@ export function Calibration({
             </span>
             {!isCameraReady && (
               <button
+                type="button"
                 onClick={onRequestCamera}
                 className="text-xs px-3 py-1.5 rounded-xl font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1.5 shadow"
               >
@@ -51,8 +62,20 @@ export function Calibration({
           </div>
         </div>
 
-        {/* Viewport Frame with Overlay */}
-        <div className="relative flex-1 bg-black/40 rounded-2xl overflow-hidden border-2 border-slate-700/60 flex items-center justify-center min-h-[360px]">
+        {/* Viewport Frame with Live Video */}
+        <div className="relative flex-1 bg-black rounded-2xl overflow-hidden border-2 border-slate-700/60 flex items-center justify-center min-h-[360px]">
+          {/* Live Video in Calibration Frame */}
+          <video
+            ref={calibVideoRef}
+            playsInline
+            muted
+            autoPlay
+            className="absolute inset-0 w-full h-full object-cover -scale-x-100 z-0"
+          />
+
+          {/* Center Dividing Line in Preview */}
+          <div className="absolute inset-y-0 left-1/2 w-[2px] bg-white/50 -translate-x-1/2 pointer-events-none z-10 shadow" />
+
           {/* Top Zone Labels */}
           <div className="absolute inset-x-0 top-4 flex justify-between px-6 pointer-events-none z-20">
             <div className="bg-sky-500/90 text-white font-extrabold text-lg px-4 py-1.5 rounded-xl shadow-lg border border-sky-300">
@@ -82,19 +105,26 @@ export function Calibration({
             </div>
           </div>
 
-          {/* Camera Error Message Overlay */}
-          {cameraError && (
+          {/* Camera Inactive / Error Overlay */}
+          {!isCameraReady && (
             <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-30 space-y-4">
-              <AlertCircle size={48} className="text-amber-400" />
+              <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                <Camera size={32} />
+              </div>
               <div className="max-w-md space-y-1">
-                <h3 className="font-bold text-lg text-white">Kamera Belum Aktif di Layar</h3>
-                <p className="text-sm text-slate-400">{cameraError}</p>
+                <h3 className="font-bold text-lg text-white">
+                  {cameraError ? "Kendala Kamera" : "Kamera Belum Aktif di Layar"}
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {cameraError || "Klik tombol di bawah untuk mengizinkan akses kamera PID agar seluruh kelas terlihat di layar."}
+                </p>
               </div>
               <button
+                type="button"
                 onClick={onRequestCamera}
-                className="px-6 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-sm shadow-xl shadow-sky-500/30 flex items-center gap-2"
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-95 text-white font-black text-sm shadow-xl shadow-emerald-500/30 flex items-center gap-2 transition active:scale-95"
               >
-                <RefreshCw size={18} /> Coba Sambungkan Kamera Lagi
+                <Camera size={18} /> Nyalakan / Izinkan Kamera
               </button>
             </div>
           )}
