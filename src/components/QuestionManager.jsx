@@ -6,10 +6,6 @@ import {
   CheckCircle, AlertCircle, HelpCircle
 } from 'lucide-react';
 import { exportSetToJson, parseImportedJson } from '../utils/storage';
-import { 
-  uploadAllSetsToVercel, 
-  fetchQuestionSetsFromVercel 
-} from '../services/vercelKv';
 
 export const CHATGPT_PROMPT_TEMPLATE = `Kamu adalah asisten guru yang ahli membuat kuis interaktif untuk siswa sekolah dasar.
 Tolong buatkan set soal kuis pilihan ganda 2 opsi (A dan B) untuk permainan gerak "Lompat Pilih" PID dengan topik: [TULIS TOPIK/MATERI DI SINI, contoh: Rantai Makanan Kelas 5 SD].
@@ -60,11 +56,7 @@ export function QuestionManager({
   const [pasteText, setPasteText] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
-  // Cloud Database modal state (Vercel KV)
-  const [showCloudModal, setShowCloudModal] = useState(false);
-  const [cloudModalMsg, setCloudModalMsg] = useState(null);
-  const [isUploadingAll, setIsUploadingAll] = useState(false);
-  const [isCheckingConnection, setIsCheckingConnection] = useState(false);
+
 
   const activeSet = sets.find(s => s.id === currentSetId) || sets[0];
 
@@ -139,41 +131,7 @@ export function QuestionManager({
     onSelectSet(duplicatedId);
   };
 
-  // Vercel KV Cloud Operations
-  const handleCheckConnection = async () => {
-    setIsCheckingConnection(true);
-    setCloudModalMsg(null);
-    try {
-      const res = await fetchQuestionSetsFromVercel();
-      if (res && res.configured) {
-        setCloudModalMsg({ type: 'success', text: 'Koneksi Vercel KV aktif dan berhasil terhubung!' });
-      } else {
-        setCloudModalMsg({ 
-          type: 'info', 
-          text: 'Vercel KV belum terdeteksi. Pastikan database KV sudah di-connect ke project di Dashboard Vercel.' 
-        });
-      }
-      if (onCloudConfigChange) onCloudConfigChange();
-    } catch (err) {
-      setCloudModalMsg({ type: 'error', text: 'Gagal mengecek koneksi: ' + err.message });
-    } finally {
-      setIsCheckingConnection(false);
-    }
-  };
 
-  const handleUploadAllToCloud = async () => {
-    try {
-      setIsUploadingAll(true);
-      setCloudModalMsg(null);
-      await uploadAllSetsToVercel(sets);
-      setCloudModalMsg({ type: 'success', text: `Semua ${sets.length} set kuis berhasil disinkronkan ke Vercel KV online!` });
-      if (onCloudConfigChange) onCloudConfigChange();
-    } catch (err) {
-      setCloudModalMsg({ type: 'error', text: 'Gagal mengunggah ke Vercel KV: ' + err.message });
-    } finally {
-      setIsUploadingAll(false);
-    }
-  };
 
   // Save / Add Question
   const handleSaveQuestion = (qData) => {
@@ -295,24 +253,7 @@ export function QuestionManager({
             Set Soal ({sets.length})
           </div>
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => {
-                setCloudModalMsg(null);
-                setShowCloudModal(true);
-              }}
-              className={`p-2 rounded-lg border font-bold text-xs flex items-center gap-1 transition ${
-                cloudStatus === 'connected'
-                  ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/80'
-                  : cloudStatus === 'syncing'
-                  ? 'bg-amber-950/80 border-amber-500/60 text-amber-300 animate-pulse'
-                  : cloudStatus === 'offline'
-                  ? 'bg-rose-950/80 border-rose-500/60 text-rose-300'
-                  : 'bg-slate-800 border-slate-700 text-sky-400 hover:bg-slate-700'
-              }`}
-              title="Database Cloud Vercel KV — Klik untuk Pengaturan"
-            >
-              <Cloud size={15} />
-            </button>
+
             <button
               onClick={handleCreateNewSet}
               className="p-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs flex items-center gap-1 transition shadow"
@@ -425,27 +366,17 @@ export function QuestionManager({
               cloudStatus === 'offline' ? 'bg-rose-400' : 'bg-slate-500'
             }`} />
             <span>
-              {cloudStatus === 'connected' && 'Tersambung ke Vercel KV Database (Serverless) • Setiap soal otomatis tersimpan online.'}
-              {cloudStatus === 'syncing' && 'Menyinkronkan data soal ke Vercel KV...'}
-              {cloudStatus === 'offline' && 'Mode Offline / Lokal. Soal tersimpan di cache lokal browser ini.'}
-              {cloudStatus === 'unconfigured' && 'Database Vercel KV belum terhubung. Soal tersimpan di browser ini (localStorage).'}
+              {cloudStatus === 'connected' && 'Database Vercel Terhubung • Setiap soal otomatis tersimpan ke cloud.'}
+              {cloudStatus === 'syncing' && 'Menyinkronkan data soal ke Database Vercel...'}
+              {cloudStatus === 'offline' && 'Mode Offline. Soal tersimpan di cache lokal browser ini.'}
+              {cloudStatus === 'unconfigured' && 'Database Vercel otomatis tersinkronisasi.'}
             </span>
           </div>
 
-          <button
-            onClick={() => {
-              setCloudModalMsg(null);
-              setShowCloudModal(true);
-            }}
-            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
-              cloudStatus === 'connected'
-                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
-                : 'bg-sky-500 hover:bg-sky-400 text-white shadow'
-            }`}
-          >
-            <Database size={13} />
-            <span>{cloudStatus === 'connected' ? 'Kelola Vercel KV' : 'Database Vercel'}</span>
-          </button>
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800/80 border border-slate-700/80 text-[11px] font-bold text-slate-300">
+            <Database size={13} className={cloudStatus === 'connected' ? 'text-emerald-400' : 'text-sky-400'} />
+            <span>Database Vercel</span>
+          </div>
         </div>
 
         {/* Set Header & Settings */}
@@ -937,129 +868,6 @@ export function QuestionManager({
         </div>
       )}
 
-      {/* Vercel KV Database Modal */}
-      {showCloudModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl space-y-5 animate-fadeIn max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
-                  <Database size={20} />
-                </div>
-                <div>
-                  <h3 className="font-black text-lg text-white">Database Online (Vercel KV Serverless)</h3>
-                  <p className="text-xs text-slate-400">Sinkronisasi bank soal otomatis tanpa perlu API key di sisi browser</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCloudModal(false)}
-                className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Status Card */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-sm ${
-              cloudStatus === 'connected'
-                ? 'bg-emerald-950/50 border-emerald-500/60 text-emerald-200'
-                : cloudStatus === 'syncing'
-                ? 'bg-amber-950/50 border-amber-500/60 text-amber-200 animate-pulse'
-                : cloudStatus === 'offline'
-                ? 'bg-rose-950/50 border-rose-500/60 text-rose-200'
-                : 'bg-slate-800/60 border-slate-700 text-slate-300'
-            }`}>
-              <div className="flex items-center gap-3">
-                <Cloud size={24} className={
-                  cloudStatus === 'connected' ? 'text-emerald-400' :
-                  cloudStatus === 'syncing' ? 'text-amber-400' :
-                  cloudStatus === 'offline' ? 'text-rose-400' : 'text-slate-400'
-                } />
-                <div>
-                  <div className="font-bold">
-                    {cloudStatus === 'connected' ? 'Status: Terhubung ke Vercel KV (Online)' :
-                     cloudStatus === 'syncing' ? 'Status: Sedang Menyinkronkan...' :
-                     cloudStatus === 'offline' ? 'Status: Mode Offline / Lokal' :
-                     'Status: Vercel KV Belum Aktif'}
-                  </div>
-                  <div className="text-xs opacity-80">
-                    {cloudStatus === 'connected'
-                      ? 'Setiap perubahan soal otomatis tersimpan ke Vercel KV.'
-                      : 'Data soal saat ini tersimpan aman di browser ini (localStorage).'}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleCheckConnection}
-                disabled={isCheckingConnection}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 text-xs font-semibold transition flex items-center gap-1.5"
-                title="Periksa ulang koneksi ke serverless API"
-              >
-                <RefreshCw size={13} className={isCheckingConnection ? 'animate-spin' : ''} />
-                <span>{isCheckingConnection ? 'Mengecek...' : 'Cek Status'}</span>
-              </button>
-            </div>
-
-            {/* Feedback Message */}
-            {cloudModalMsg && (
-              <div className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
-                cloudModalMsg.type === 'success'
-                  ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
-                  : cloudModalMsg.type === 'info'
-                  ? 'bg-sky-950/80 border-sky-600 text-sky-300'
-                  : 'bg-rose-950/80 border-rose-600 text-rose-300'
-              }`}>
-                {cloudModalMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-                <span>{cloudModalMsg.text}</span>
-              </div>
-            )}
-
-            {/* Upload All Local Sets to Vercel KV */}
-            <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/80 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-sm text-white">Sinkronkan Semua Soal Lokal ke Vercel KV</h4>
-                  <p className="text-xs text-slate-400">Unggah seluruh {sets.length} set kuis saat ini ke database online</p>
-                </div>
-                <button
-                  onClick={handleUploadAllToCloud}
-                  disabled={isUploadingAll}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-emerald-600/30"
-                >
-                  <RefreshCw size={14} className={isUploadingAll ? 'animate-spin' : ''} />
-                  <span>{isUploadingAll ? 'Mengunggah...' : 'Unggah Sekarang'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Vercel KV Activation Instructions */}
-            <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
-              <div className="flex items-center gap-2 text-sky-400 font-bold text-xs">
-                <Server size={16} />
-                <span>Cara Mengaktifkan Database Vercel KV (Otomatis & Gratis):</span>
-              </div>
-              <ol className="space-y-2 text-xs text-slate-300 list-decimal list-inside leading-relaxed">
-                <li>Buka dashboard proyek Anda di <strong className="text-white">vercel.com</strong>.</li>
-                <li>Pilih tab <strong className="text-white">Storage</strong> lalu klik tombol <strong className="text-emerald-400">Create Database</strong>.</li>
-                <li>Pilih <strong className="text-white">KV</strong> (atau Upstash Redis) dan buat instance baru.</li>
-                <li>Klik <strong className="text-sky-400">Connect to Project</strong> lalu pilih project <code className="bg-slate-800 px-1.5 py-0.5 rounded text-amber-300">lompatjawab</code>.</li>
-                <li>Deploy ulang / buka web Anda. Game otomatis mendeteksi database tanpa perlu konfigurasi tambahan apa pun!</li>
-              </ol>
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-              <button
-                onClick={() => setShowCloudModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
