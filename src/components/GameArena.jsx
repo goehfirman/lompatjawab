@@ -83,7 +83,7 @@ export function GameArena({
           return 0;
         }
 
-        if (prev <= 4 && prev > 1) {
+        if (prev <= 6 && prev > 1) {
           audioRef.current?.playWarningBeep(prev - 1);
         } else {
           audioRef.current?.playTick();
@@ -181,7 +181,7 @@ export function GameArena({
   }, [isRevealed, timeLeft]);
 
   const timerPct = (timeLeft / timerSeconds) * 100;
-  const isUrgent = timeLeft <= 3 && timeLeft > 0;
+  const isUrgent = timeLeft <= 5 && timeLeft > 0;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden text-slate-100 relative select-none z-10">
@@ -249,30 +249,59 @@ export function GameArena({
           </div>
         </div>
 
+        {/* Translucent 5-Second Center Countdown Overlay */}
+        {!isRevealed && countdownStart === 0 && timeLeft <= 5 && timeLeft > 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-30">
+            <div
+              key={timeLeft}
+              className={`flex flex-col items-center justify-center w-52 h-52 sm:w-64 sm:h-64 rounded-full bg-slate-950/45 backdrop-blur-[3px] border-4 transition-all animate-countdownPop ${
+                timeLeft <= 2
+                  ? 'border-rose-500/80 shadow-[0_0_80px_rgba(244,63,94,0.6)]'
+                  : 'border-amber-400/80 shadow-[0_0_70px_rgba(245,158,11,0.5)]'
+              }`}
+            >
+              <span
+                className={`text-8xl sm:text-9xl md:text-[10rem] font-black font-mono leading-none drop-shadow-[0_8px_24px_rgba(0,0,0,0.95)] ${
+                  timeLeft <= 2 ? 'text-rose-400/95' : 'text-amber-300/95'
+                }`}
+              >
+                {timeLeft}
+              </span>
+              <span
+                className={`text-xs sm:text-sm font-black uppercase tracking-widest -mt-1 drop-shadow-md ${
+                  timeLeft <= 2 ? 'text-rose-200/90' : 'text-amber-200/90'
+                }`}
+              >
+                {timeLeft === 1 ? 'WAKTU HABIS!' : 'DETIK LAGI!'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Split Screen Zones: Left (A) | Straight Line | Right (B) */}
         <div className="absolute inset-0 flex pointer-events-none">
           {/* Zone A (Left Half) */}
-          <div className={`flex-1 flex flex-col justify-start items-start p-4 sm:p-6 pt-24 sm:pt-28 gap-3 transition-all duration-500 ${
+          <div className={`flex-1 flex flex-col justify-start items-start p-4 sm:p-6 pt-24 sm:pt-28 gap-3 transition-all duration-500 relative ${
             isRevealed
               ? currentQ.correctAnswer === 'A'
-                ? 'bg-emerald-500/15 backdrop-brightness-105'
-                : 'bg-rose-600/20'
+                ? 'bg-emerald-600/60 backdrop-brightness-110 shadow-[inset_0_0_130px_rgba(5,150,105,0.75)]'
+                : 'bg-rose-700/65 backdrop-brightness-90 shadow-[inset_0_0_130px_rgba(225,29,72,0.85)]'
               : ''
           }`}>
             {/* Choice Card A (Top Left) */}
             <div className={`p-3.5 sm:p-4 rounded-2xl min-w-[220px] max-w-xs sm:max-w-sm pointer-events-auto transition-all duration-300 shadow-xl ${
               isRevealed
                 ? currentQ.correctAnswer === 'A'
-                  ? 'bg-emerald-950/90 border-2 border-emerald-400 shadow-emerald-500/40'
-                  : 'bg-rose-950/90 border-2 border-rose-500 opacity-80'
+                  ? 'bg-emerald-950/95 border-4 border-emerald-400 shadow-2xl shadow-emerald-500/60 ring-4 ring-emerald-400/30'
+                  : 'bg-rose-950/95 border-4 border-rose-500 shadow-2xl shadow-rose-600/60 ring-4 ring-rose-500/30'
                 : 'bg-slate-900/85 border-2 border-sky-500/70 shadow-lg'
             }`}>
               <div className="flex items-center gap-2.5 mb-1.5">
-                <span className={`w-9 h-9 rounded-xl text-white flex items-center justify-center font-black text-lg shadow border ${
+                <span className={`w-9 h-9 rounded-xl text-white flex items-center justify-center font-black text-lg shadow border-2 ${
                   isRevealed
                     ? currentQ.correctAnswer === 'A'
-                      ? 'bg-emerald-500 border-emerald-300'
-                      : 'bg-rose-600 border-rose-400'
+                      ? 'bg-emerald-500 border-emerald-200 shadow-emerald-400/50'
+                      : 'bg-rose-600 border-rose-200 shadow-rose-500/50'
                     : 'bg-sky-500 border-sky-300'
                 }`}>
                   A
@@ -301,13 +330,13 @@ export function GameArena({
             {isRevealed && (
               <div className="animate-bounce-short pointer-events-auto">
                 {currentQ.correctAnswer === 'A' ? (
-                  <div className="px-4 py-2 rounded-xl bg-emerald-500 text-white font-black text-sm flex items-center gap-2 shadow-lg border border-emerald-300">
-                    <ShieldCheck size={18} />
+                  <div className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-emerald-200 shadow-emerald-500/60">
+                    <ShieldCheck size={20} />
                     <span>ZONA A BENAR (LOLOS)</span>
                   </div>
                 ) : (
-                  <div className="px-4 py-2 rounded-xl bg-rose-600 text-white font-black text-sm flex items-center gap-2 shadow-lg border border-rose-300 animate-pulse">
-                    <X size={18} />
+                  <div className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-rose-200 shadow-rose-600/60 animate-pulse">
+                    <X size={20} />
                     <span>ZONA A SALAH (GUGUR)</span>
                   </div>
                 )}
@@ -316,22 +345,24 @@ export function GameArena({
           </div>
 
           {/* Garis Lurus Pemisah Tengah Saja (Single Straight Line) */}
-          <div className="w-[1.5px] bg-white/40 self-stretch pointer-events-none shadow-sm" />
+          <div className={`w-[2px] self-stretch pointer-events-none transition-all duration-500 ${
+            isRevealed ? 'bg-white/80 shadow-[0_0_12px_rgba(255,255,255,0.8)]' : 'bg-white/40 shadow-sm'
+          }`} />
 
           {/* Zone B (Right Half) */}
-          <div className={`flex-1 flex flex-col justify-start items-end p-4 sm:p-6 pt-24 sm:pt-28 gap-3 transition-all duration-500 ${
+          <div className={`flex-1 flex flex-col justify-start items-end p-4 sm:p-6 pt-24 sm:pt-28 gap-3 transition-all duration-500 relative ${
             isRevealed
               ? currentQ.correctAnswer === 'B'
-                ? 'bg-emerald-500/15 backdrop-brightness-105'
-                : 'bg-rose-600/20'
+                ? 'bg-emerald-600/60 backdrop-brightness-110 shadow-[inset_0_0_130px_rgba(5,150,105,0.75)]'
+                : 'bg-rose-700/65 backdrop-brightness-90 shadow-[inset_0_0_130px_rgba(225,29,72,0.85)]'
               : ''
           }`}>
             {/* Choice Card B (Top Right) */}
             <div className={`p-3.5 sm:p-4 rounded-2xl min-w-[220px] max-w-xs sm:max-w-sm text-right pointer-events-auto transition-all duration-300 shadow-xl ${
               isRevealed
                 ? currentQ.correctAnswer === 'B'
-                  ? 'bg-emerald-950/90 border-2 border-emerald-400 shadow-emerald-500/40'
-                  : 'bg-rose-950/90 border-2 border-rose-500 opacity-80'
+                  ? 'bg-emerald-950/95 border-4 border-emerald-400 shadow-2xl shadow-emerald-500/60 ring-4 ring-emerald-400/30'
+                  : 'bg-rose-950/95 border-4 border-rose-500 shadow-2xl shadow-rose-600/60 ring-4 ring-rose-500/30'
                 : 'bg-slate-900/85 border-2 border-amber-500/70 shadow-lg'
             }`}>
               <div className="flex items-center justify-end gap-2.5 mb-1.5">
@@ -349,11 +380,11 @@ export function GameArena({
                     Siswa: {crowdDensity.pctB}%
                   </span>
                 </div>
-                <span className={`w-9 h-9 rounded-xl text-white flex items-center justify-center font-black text-lg shadow border ${
+                <span className={`w-9 h-9 rounded-xl text-white flex items-center justify-center font-black text-lg shadow border-2 ${
                   isRevealed
                     ? currentQ.correctAnswer === 'B'
-                      ? 'bg-emerald-500 border-emerald-300'
-                      : 'bg-rose-600 border-rose-400'
+                      ? 'bg-emerald-500 border-emerald-200 shadow-emerald-400/50'
+                      : 'bg-rose-600 border-rose-200 shadow-rose-500/50'
                     : 'bg-amber-500 border-amber-300'
                 }`}>
                   B
@@ -368,13 +399,13 @@ export function GameArena({
             {isRevealed && (
               <div className="animate-bounce-short pointer-events-auto">
                 {currentQ.correctAnswer === 'B' ? (
-                  <div className="px-4 py-2 rounded-xl bg-emerald-500 text-white font-black text-sm flex items-center gap-2 shadow-lg border border-emerald-300">
-                    <ShieldCheck size={18} />
+                  <div className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-emerald-200 shadow-emerald-500/60">
+                    <ShieldCheck size={20} />
                     <span>ZONA B BENAR (LOLOS)</span>
                   </div>
                 ) : (
-                  <div className="px-4 py-2 rounded-xl bg-rose-600 text-white font-black text-sm flex items-center gap-2 shadow-lg border border-rose-300 animate-pulse">
-                    <X size={18} />
+                  <div className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-rose-200 shadow-rose-600/60 animate-pulse">
+                    <X size={20} />
                     <span>ZONA B SALAH (GUGUR)</span>
                   </div>
                 )}
