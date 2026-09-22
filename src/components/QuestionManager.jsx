@@ -2,9 +2,16 @@ import React, { useState } from 'react';
 import { 
   Plus, Trash2, Copy, ArrowUp, ArrowDown, Download, Upload, Eye, 
   Check, AlertTriangle, Clock, Shuffle, BookOpen, Layers, X, Image as ImageIcon,
-  Sparkles, Clipboard, CheckCheck
+  Sparkles, Clipboard, CheckCheck, Cloud, Database, RefreshCw, Server,
+  CheckCircle, AlertCircle, HelpCircle
 } from 'lucide-react';
 import { exportSetToJson, parseImportedJson } from '../utils/storage';
+import { 
+  getFirebaseConfig, 
+  saveFirebaseConfig, 
+  removeFirebaseConfig, 
+  uploadAllSetsToCloud 
+} from '../services/firebase';
 
 export const CHATGPT_PROMPT_TEMPLATE = `Kamu adalah asisten guru yang ahli membuat kuis interaktif untuk siswa sekolah dasar.
 Tolong buatkan set soal kuis pilihan ganda 2 opsi (A dan B) untuk permainan gerak "Lompat Pilih" PID dengan topik: [TULIS TOPIK/MATERI DI SINI, contoh: Rantai Makanan Kelas 5 SD].
@@ -41,7 +48,10 @@ export function QuestionManager({
   sets,
   activeSetId,
   onSelectSet,
-  onUpdateSets
+  onUpdateSets,
+  cloudStatus = 'unconfigured',
+  isCloudConfigured = false,
+  onCloudConfigChange
 }) {
   const [currentSetId, setCurrentSetId] = useState(activeSetId);
   const [editingQuestion, setEditingQuestion] = useState(null); // null or question object
@@ -52,17 +62,26 @@ export function QuestionManager({
   const [pasteText, setPasteText] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
-  const activeSet = sets.find(s => s.id === currentSetId) || sets[0];
+  // Cloud Firebase modal state
+  const [showCloudModal, setShowCloudModal] = useState(false);
+  const [cloudConfigInput, setCloudConfigInput] = useState('');
+  const [cloudModalMsg, setCloudModalMsg] = useState(null);
+  const [isUploadingAll, setIsUploadingAll] = useState(false);
 
-  // Helper to update current active set
+  const activeSet = sets.find(s => s.id === currentSetId) || sets[0];
+  const currentConfig = getFirebaseConfig();
+
+  // Helper to update current active set and trigger sync
   const updateCurrentSet = (updatedFields) => {
+    let modified = null;
     const updatedSets = sets.map(s => {
       if (s.id === activeSet.id) {
-        return { ...s, ...updatedFields };
+        modified = { ...s, ...updatedFields };
+        return modified;
       }
       return s;
     });
-    onUpdateSets(updatedSets);
+    onUpdateSets(updatedSets, modified);
   };
 
   // Create new set
@@ -89,7 +108,7 @@ export function QuestionManager({
       ]
     };
     const updatedSets = [newSet, ...sets];
-    onUpdateSets(updatedSets);
+    onUpdateSets(updatedSets, newSet);
     setCurrentSetId(newId);
     onSelectSet(newId);
   };
@@ -102,7 +121,7 @@ export function QuestionManager({
     }
     if (confirm(`Yakin ingin menghapus set soal "${activeSet.title}"?`)) {
       const remaining = sets.filter(s => s.id !== idToDelete);
-      onUpdateSets(remaining);
+      onUpdateSets(remaining, null, idToDelete);
       const nextId = remaining[0].id;
       setCurrentSetId(nextId);
       onSelectSet(nextId);
@@ -118,9 +137,67 @@ export function QuestionManager({
       title: `${activeSet.title} (Salinan)`
     };
     const updatedSets = [dupSet, ...sets];
-    onUpdateSets(updatedSets);
+    onUpdateSets(updatedSets, dupSet);
     setCurrentSetId(duplicatedId);
     onSelectSet(duplicatedId);
+  };
+
+  // Firebase Cloud Operations
+  const handleSaveFirebaseConfig = () => {
+    try {
+      setCloudModalMsg(null);
+      let text = cloudConfigInput.trim();
+      let parsed = null;
+
+      if (text.includes('{')) {
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        if (start !== -1 && end !== -1) {
+          const jsonish = text.substring(start, end + 1);
+          try {
+            parsed = JSON.parse(jsonish);
+          } catch (e) {
+            const clean = jsonish
+              .replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":')
+              .replace(/'/g, '"')
+              .replace(/,\s*}/g, '}');
+            parsed = JSON.parse(clean);
+          }
+        }
+      }
+
+      if (!parsed || !parsed.apiKey || !parsed.projectId) {
+        throw new Error("Format konfigurasi tidak sesuai. Pastikan ada 'apiKey' dan 'projectId'.");
+      }
+
+      saveFirebaseConfig(parsed);
+      if (onCloudConfigChange) onCloudConfigChange();
+      setCloudModalMsg({ type: 'success', text: `Berhasil terhubung ke Firebase Project "${parsed.projectId}"!` });
+      setCloudConfigInput('');
+    } catch (err) {
+      setCloudModalMsg({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleUploadAllToCloud = async () => {
+    try {
+      setIsUploadingAll(true);
+      setCloudModalMsg(null);
+      await uploadAllSetsToCloud(sets);
+      setCloudModalMsg({ type: 'success', text: `Semua ${sets.length} set kuis berhasil disinkronkan ke Firestore online!` });
+    } catch (err) {
+      setCloudModalMsg({ type: 'error', text: 'Gagal mengunggah ke Firebase: ' + err.message });
+    } finally {
+      setIsUploadingAll(false);
+    }
+  };
+
+  const handleDisconnectFirebase = () => {
+    if (confirm("Yakin ingin memutuskan koneksi Firebase? Bank soal akan kembali menggunakan penyimpanan lokal di browser ini.")) {
+      removeFirebaseConfig();
+      if (onCloudConfigChange) onCloudConfigChange();
+      setCloudModalMsg({ type: 'info', text: 'Koneksi Firebase diputuskan. Berjalan dalam mode lokal (offline).' });
+    }
   };
 
   // Save / Add Question
@@ -242,13 +319,33 @@ export function QuestionManager({
             <Layers size={18} className="text-sky-400" />
             Set Soal ({sets.length})
           </div>
-          <button
-            onClick={handleCreateNewSet}
-            className="p-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs flex items-center gap-1 transition shadow"
-            title="Tambah Set Soal Baru"
-          >
-            <Plus size={16} /> Buat
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                setCloudModalMsg(null);
+                setShowCloudModal(true);
+              }}
+              className={`p-2 rounded-lg border font-bold text-xs flex items-center gap-1 transition ${
+                cloudStatus === 'connected'
+                  ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300 hover:bg-emerald-900/80'
+                  : cloudStatus === 'syncing'
+                  ? 'bg-amber-950/80 border-amber-500/60 text-amber-300 animate-pulse'
+                  : cloudStatus === 'offline'
+                  ? 'bg-rose-950/80 border-rose-500/60 text-rose-300'
+                  : 'bg-slate-800 border-slate-700 text-sky-400 hover:bg-slate-700'
+              }`}
+              title="Database Cloud Firebase — Klik untuk Pengaturan"
+            >
+              <Cloud size={15} />
+            </button>
+            <button
+              onClick={handleCreateNewSet}
+              className="p-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs flex items-center gap-1 transition shadow"
+              title="Tambah Set Soal Baru"
+            >
+              <Plus size={16} /> Buat
+            </button>
+          </div>
         </div>
 
         {/* Set list */}
@@ -335,6 +432,46 @@ export function QuestionManager({
             <AlertTriangle size={18} /> {importError}
           </div>
         )}
+
+        {/* Cloud Sync Status Banner */}
+        <div className={`px-4 py-2.5 rounded-2xl border flex flex-wrap items-center justify-between gap-3 text-xs transition ${
+          cloudStatus === 'connected'
+            ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+            : cloudStatus === 'syncing'
+            ? 'bg-amber-950/40 border-amber-500/50 text-amber-300 animate-pulse'
+            : cloudStatus === 'offline'
+            ? 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+            : 'bg-slate-900/70 border-slate-800 text-slate-300'
+        }`}>
+          <div className="flex items-center gap-2.5 font-semibold">
+            <span className={`w-2.5 h-2.5 rounded-full ${
+              cloudStatus === 'connected' ? 'bg-emerald-400 animate-pulse' :
+              cloudStatus === 'syncing' ? 'bg-amber-400 animate-ping' :
+              cloudStatus === 'offline' ? 'bg-rose-400' : 'bg-slate-500'
+            }`} />
+            <span>
+              {cloudStatus === 'connected' && `Tersambung ke Database Firebase (${currentConfig?.projectId || 'Online'}) • Setiap soal otomatis tersimpan online.`}
+              {cloudStatus === 'syncing' && 'Menyinkronkan data soal ke Firebase Firestore online...'}
+              {cloudStatus === 'offline' && 'Koneksi ke Firebase terputus. Soal tersimpan di cache lokal browser ini.'}
+              {cloudStatus === 'unconfigured' && 'Database Cloud belum diatur. Soal saat ini tersimpan di browser ini (localStorage).'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => {
+              setCloudModalMsg(null);
+              setShowCloudModal(true);
+            }}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+              cloudStatus === 'connected'
+                ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
+                : 'bg-sky-500 hover:bg-sky-400 text-white shadow'
+            }`}
+          >
+            <Database size={13} />
+            <span>{cloudStatus === 'connected' ? 'Kelola Cloud' : 'Hubungkan Firebase'}</span>
+          </button>
+        </div>
 
         {/* Set Header & Settings */}
         <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
@@ -820,6 +957,146 @@ export function QuestionManager({
                   Impor ke Bank Soal
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Firebase Database Configuration Modal */}
+      {showCloudModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl space-y-5 animate-fadeIn max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <Database size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-lg text-white">Database Online (Firebase Firestore)</h3>
+                  <p className="text-xs text-slate-400">Simpan dan sinkronkan bank soal ke cloud secara otomatis</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCloudModal(false)}
+                className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Status Card */}
+            <div className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-sm ${
+              cloudStatus === 'connected'
+                ? 'bg-emerald-950/50 border-emerald-500/60 text-emerald-200'
+                : cloudStatus === 'syncing'
+                ? 'bg-amber-950/50 border-amber-500/60 text-amber-200 animate-pulse'
+                : cloudStatus === 'offline'
+                ? 'bg-rose-950/50 border-rose-500/60 text-rose-200'
+                : 'bg-slate-800/60 border-slate-700 text-slate-300'
+            }`}>
+              <div className="flex items-center gap-3">
+                <Cloud size={24} className={
+                  cloudStatus === 'connected' ? 'text-emerald-400' :
+                  cloudStatus === 'syncing' ? 'text-amber-400' :
+                  cloudStatus === 'offline' ? 'text-rose-400' : 'text-slate-400'
+                } />
+                <div>
+                  <div className="font-bold">
+                    {cloudStatus === 'connected' ? 'Status: Terhubung ke Firebase' :
+                     cloudStatus === 'syncing' ? 'Status: Sedang Menyinkronkan...' :
+                     cloudStatus === 'offline' ? 'Status: Terputus dari Firebase' :
+                     'Status: Belum Terhubung ke Firebase'}
+                  </div>
+                  <div className="text-xs opacity-80">
+                    {currentConfig
+                      ? `Project ID: ${currentConfig.projectId}`
+                      : 'Saat ini menggunakan penyimpanan lokal browser (localStorage).'}
+                  </div>
+                </div>
+              </div>
+
+              {isCloudConfigured && (
+                <button
+                  onClick={handleDisconnectFirebase}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 text-slate-400 border border-slate-700 text-xs font-semibold transition"
+                >
+                  Putuskan
+                </button>
+              )}
+            </div>
+
+            {/* Feedback Message */}
+            {cloudModalMsg && (
+              <div className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                cloudModalMsg.type === 'success'
+                  ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
+                  : cloudModalMsg.type === 'info'
+                  ? 'bg-sky-950/80 border-sky-600 text-sky-300'
+                  : 'bg-rose-950/80 border-rose-600 text-rose-300'
+              }`}>
+                {cloudModalMsg.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                <span>{cloudModalMsg.text}</span>
+              </div>
+            )}
+
+            {/* Upload All Local Sets to Cloud Button */}
+            {isCloudConfigured && (
+              <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-sm text-white">Sinkronkan Semua Soal ke Cloud</h4>
+                    <p className="text-xs text-slate-400">Unggah seluruh {sets.length} set soal lokal ke Firestore sekarang</p>
+                  </div>
+                  <button
+                    onClick={handleUploadAllToCloud}
+                    disabled={isUploadingAll}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-emerald-600/30"
+                  >
+                    <RefreshCw size={14} className={isUploadingAll ? 'animate-spin' : ''} />
+                    <span>{isUploadingAll ? 'Mengunggah...' : 'Unggah Sekarang'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Configuration Form */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  {isCloudConfigured ? 'Perbarui Konfigurasi Firebase' : 'Masukkan Konfigurasi Firebase Web App'}
+                </label>
+                <span className="text-[11px] text-amber-400 font-semibold">Firebase Console → Project Settings</span>
+              </div>
+
+              <textarea
+                rows="6"
+                value={cloudConfigInput}
+                onChange={(e) => setCloudConfigInput(e.target.value)}
+                placeholder={`Tempel (Paste) objek konfigurasi dari Firebase Console di sini, contoh:\n{\n  apiKey: "AIzaSy...",\n  authDomain: "proyek-ku.firebaseapp.com",\n  projectId: "proyek-ku",\n  storageBucket: "proyek-ku.appspot.com",\n  messagingSenderId: "123456789",\n  appId: "1:12345:web:abcdef"\n}`}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3.5 font-mono text-xs text-slate-200 focus:outline-none focus:border-amber-400"
+              />
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                💡 <strong>Tips Cepat:</strong> Anda bisa langsung copy-paste cuplikan <code>const firebaseConfig = &#123; ... &#125;;</code> dari halaman Firebase Console. Sistem otomatis mendeteksi formatnya.
+              </p>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <button
+                onClick={() => setShowCloudModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition"
+              >
+                Tutup
+              </button>
+              {cloudConfigInput.trim() && (
+                <button
+                  onClick={handleSaveFirebaseConfig}
+                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-95 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition active:scale-95"
+                >
+                  Simpan & Hubungkan
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -173,3 +173,36 @@ export function parseImportedJson(jsonString) {
     throw new Error("Gagal membaca format JSON: " + err.message);
   }
 }
+
+/**
+ * Merge local question sets with cloud question sets
+ */
+export function mergeLocalAndCloudSets(localSets, cloudSets) {
+  if (!Array.isArray(cloudSets) || cloudSets.length === 0) {
+    return localSets;
+  }
+
+  const cloudMap = new Map();
+  cloudSets.forEach(s => {
+    if (s && s.id) cloudMap.set(s.id, s);
+  });
+
+  const merged = [];
+  const processedIds = new Set();
+
+  // 1. Cloud sets take priority
+  cloudSets.forEach(cs => {
+    merged.push(cs);
+    processedIds.add(cs.id);
+  });
+
+  // 2. Keep local sets that are not in cloud yet
+  (localSets || []).forEach(ls => {
+    if (ls && ls.id && !processedIds.has(ls.id)) {
+      merged.push(ls);
+      processedIds.add(ls.id);
+    }
+  });
+
+  return merged;
+}

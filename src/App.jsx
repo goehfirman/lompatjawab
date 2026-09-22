@@ -9,8 +9,16 @@ import { FinalScore } from './components/FinalScore';
 import { 
   loadQuestionSets, saveQuestionSets, 
   getActiveSetId, setActiveSetId, 
-  loadGameSettings, saveGameSettings 
+  loadGameSettings, saveGameSettings,
+  mergeLocalAndCloudSets
 } from './utils/storage';
+
+import { 
+  isFirebaseConfigured, 
+  subscribeToQuestionSets, 
+  saveQuestionSetToCloud, 
+  deleteQuestionSetFromCloud
+} from './services/firebase';
 
 import { useAudioSFX } from './hooks/useAudioSFX';
 import { usePoseDetection } from './hooks/usePoseDetection';
@@ -31,6 +39,10 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home'); // 'home' | 'manager' | 'calibration' | 'game' | 'final'
   const [finalData, setFinalData] = useState(null);
 
+  // Cloud Sync State
+  const [isCloudConfigured, setIsCloudConfigured] = useState(isFirebaseConfigured);
+  const [cloudStatus, setCloudStatus] = useState(() => isFirebaseConfigured() ? 'syncing' : 'unconfigured');
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -38,6 +50,40 @@ export default function App() {
 
   // Sound Engine
   const audioSFX = useAudioSFX(settings.soundEnabled);
+
+  // Real-time Firebase Firestore synchronization
+  useEffect(() => {
+    const configured = isFirebaseConfigured();
+    setIsCloudConfigured(configured);
+
+    if (!configured) {
+      setCloudStatus('unconfigured');
+      return;
+    }
+
+    setCloudStatus('syncing');
+
+    const unsubscribe = subscribeToQuestionSets(
+      (cloudSets) => {
+        setCloudStatus('connected');
+        if (cloudSets && cloudSets.length > 0) {
+          setSets((prevSets) => {
+            const merged = mergeLocalAndCloudSets(prevSets, cloudSets);
+            saveQuestionSets(merged);
+            return merged;
+          });
+        }
+      },
+      (err) => {
+        console.warn("Firestore subscription error", err);
+        setCloudStatus('offline');
+      }
+    );
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [isCloudConfigured]);
 
   // Pose & Crowd Detection Hook (Always persistent)
   const {
@@ -56,10 +102,37 @@ export default function App() {
     isActive: true
   });
 
-  // Save changes to localStorage
-  const handleUpdateSets = (newSets) => {
+  // Save changes to localStorage AND sync to Firebase Firestore
+  const handleUpdateSets = async (newSets, modifiedSet = null, deletedSetId = null) => {
     setSets(newSets);
     saveQuestionSets(newSets);
+
+    if (isFirebaseConfigured()) {
+      setCloudStatus('syncing');
+      try {
+        if (deletedSetId) {
+          await deleteQuestionSetFromCloud(deletedSetId);
+        } else if (modifiedSet) {
+          await saveQuestionSetToCloud(modifiedSet);
+        } else {
+          // If a general update occurred (e.g. reorder or import), sync the active set
+          const current = newSets.find(s => s.id === activeSetId) || newSets[0];
+          if (current) {
+            await saveQuestionSetToCloud(current);
+          }
+        }
+        setCloudStatus('connected');
+      } catch (err) {
+        console.error("Cloud sync failed on updateSets", err);
+        setCloudStatus('offline');
+      }
+    }
+  };
+
+  const handleCloudConfigChange = () => {
+    const configured = isFirebaseConfigured();
+    setIsCloudConfigured(configured);
+    setCloudStatus(configured ? 'syncing' : 'unconfigured');
   };
 
   const handleSelectSet = (id) => {
@@ -161,6 +234,9 @@ export default function App() {
             activeSetId={activeSetId}
             onSelectSet={handleSelectSet}
             onUpdateSets={handleUpdateSets}
+            cloudStatus={cloudStatus}
+            isCloudConfigured={isCloudConfigured}
+            onCloudConfigChange={handleCloudConfigChange}
           />
         )}
 
