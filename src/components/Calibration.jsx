@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { 
   Users, ShieldAlert, Video, Play, AlertCircle, RefreshCw, 
-  Flame, Sparkles, Footprints, Trophy, Camera 
+  Flame, Sparkles, Footprints, Trophy, Camera, Medal, Check 
 } from 'lucide-react';
 
 export function Calibration({
@@ -19,6 +19,7 @@ export function Calibration({
   const { 
     initialStudentsCount = 20, 
     survivorTarget = 1, 
+    gameMode = 'free',
     motionMode = 'jump', 
     timerOverride 
   } = settings;
@@ -212,40 +213,73 @@ export function Calibration({
             </div>
           </div>
 
-          {/* Survivor Target / Rule */}
-          <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">
-              Target Juara Bertahan
+          {/* Mode & Aturan Permainan */}
+          <div className="space-y-2">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+              Mode & Aturan Selesai
             </span>
-            <div className="grid grid-cols-2 gap-2">
+
+            {/* Mode Bebas (Semua Soal - Tanpa Batas Eliminasi) */}
+            <button
+              type="button"
+              onClick={() => onUpdateSettings({ ...settings, gameMode: 'free', survivorTarget: 0 })}
+              className={`w-full p-3.5 rounded-2xl border text-left transition flex items-start justify-between gap-3 ${
+                gameMode === 'free'
+                  ? 'bg-gradient-to-r from-emerald-950/80 to-teal-950/80 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/10'
+                  : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
+              }`}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 font-black text-sm text-white">
+                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${gameMode === 'free' ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                    <Sparkles size={14} />
+                  </div>
+                  <span>Mode Bebas (Sampai Soal Habis)</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                    Bebas
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 pl-8 leading-relaxed">
+                  Tidak ada batasan siswa tereliminasi. Seluruh kelas bermain bersama di setiap nomor soal dari awal sampai soal habis.
+                </p>
+              </div>
+              <div className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center shrink-0 ${
+                gameMode === 'free' ? 'border-emerald-400 bg-emerald-500' : 'border-slate-600'
+              }`}>
+                {gameMode === 'free' && <Check size={12} className="text-white" />}
+              </div>
+            </button>
+
+            {/* Mode Eliminasi Options */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => onUpdateSettings({ ...settings, survivorTarget: 1 })}
+                onClick={() => onUpdateSettings({ ...settings, gameMode: 'elimination', survivorTarget: 1 })}
                 className={`p-3 rounded-2xl border text-left transition ${
-                  survivorTarget === 1
-                    ? 'bg-amber-950/60 border-amber-500 text-amber-200'
-                    : 'bg-slate-800/60 border-slate-700 text-slate-400'
+                  gameMode === 'elimination' && survivorTarget === 1
+                    ? 'bg-amber-950/70 border-amber-500 text-amber-200 ring-2 ring-amber-500/40 shadow-md shadow-amber-500/10'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
                 }`}
               >
                 <div className="flex items-center gap-1.5 font-bold text-xs text-white">
-                  <Trophy size={16} className="text-amber-400" /> 1 Juara Terakhir
+                  <Trophy size={16} className="text-amber-400" /> Eliminasi: 1 Juara
                 </div>
-                <p className="text-[11px] mt-1 opacity-80">Bermain sampai tersisa 1 orang</p>
+                <p className="text-[11px] mt-1 text-slate-300 leading-snug">Main sampai tersisa 1 siswa juara</p>
               </button>
 
               <button
                 type="button"
-                onClick={() => onUpdateSettings({ ...settings, survivorTarget: 3 })}
+                onClick={() => onUpdateSettings({ ...settings, gameMode: 'elimination', survivorTarget: 3 })}
                 className={`p-3 rounded-2xl border text-left transition ${
-                  survivorTarget === 3
-                    ? 'bg-amber-950/60 border-amber-500 text-amber-200'
-                    : 'bg-slate-800/60 border-slate-700 text-slate-400'
+                  gameMode === 'elimination' && survivorTarget === 3
+                    ? 'bg-amber-950/70 border-amber-500 text-amber-200 ring-2 ring-amber-500/40 shadow-md shadow-amber-500/10'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
                 }`}
               >
                 <div className="flex items-center gap-1.5 font-bold text-xs text-white">
-                  <Sparkles size={16} className="text-sky-400" /> 3 Juara Terakhir
+                  <Medal size={16} className="text-sky-400" /> Eliminasi: Top 3
                 </div>
-                <p className="text-[11px] mt-1 opacity-80">Top 3 siswa lolos bersama</p>
+                <p className="text-[11px] mt-1 text-slate-300 leading-snug">Main sampai tersisa 3 siswa juara</p>
               </button>
             </div>
           </div>

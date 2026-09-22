@@ -216,6 +216,8 @@ export default function App() {
         activeCameraId={activeCameraId}
         onSwitchCamera={switchCamera}
         onRequestCamera={() => startCamera(activeCameraId)}
+        initialStudentsCount={settings.initialStudentsCount}
+        gameMode={settings.gameMode}
       />
 
       {/* 3. SCREEN ROUTER (Z-10) */}
@@ -280,6 +282,7 @@ export default function App() {
             totalQuestions={finalData.totalQuestions}
             questions={finalData.questions}
             roundEliminations={finalData.roundEliminations}
+            gameMode={finalData.gameMode || settings.gameMode}
             onPlayAgain={() => setCurrentScreen('game')}
             onBackToMenu={() => setCurrentScreen('home')}
           />

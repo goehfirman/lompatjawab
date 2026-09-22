@@ -81,7 +81,7 @@ export function HomeScreen({
             className="h-20 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:opacity-95 text-white font-black text-xl flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/30 transition active:scale-[0.98]"
           >
             <Play size={28} fill="currentColor" />
-            <span>Mulai Ronde Eliminasi</span>
+            <span>Mulai Permainan</span>
           </button>
 
           <button

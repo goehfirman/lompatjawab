@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Volume2, VolumeX, Maximize, Minimize, BookOpen, Play, 
-  Camera, CameraOff, Users, AlertCircle, RefreshCw 
+  Camera, CameraOff, Users, AlertCircle, RefreshCw, Sparkles 
 } from 'lucide-react';
 
 export function Navbar({
@@ -18,7 +18,8 @@ export function Navbar({
   onSwitchCamera,
   onRequestCamera,
   remainingStudents,
-  initialStudentsCount
+  initialStudentsCount,
+  gameMode = 'free'
 }) {
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [showCameraSelect, setShowCameraSelect] = React.useState(false);
@@ -50,17 +51,26 @@ export function Navbar({
               LOMPAT PILIH
             </h1>
             <p className="text-xs text-slate-400 font-medium">
-              Mode Eliminasi Massal PID
+              {gameMode === 'free' ? 'Mode Bebas PID (Semua Soal)' : 'Mode Eliminasi Massal PID'}
             </p>
           </div>
         </div>
 
-        {/* Surviving Students Indicator during Game */}
-        {currentScreen === 'game' && remainingStudents !== undefined && (
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border border-amber-500/40 text-amber-300 font-black text-sm shadow-md animate-pulse">
-            <Users size={16} className="text-amber-400" />
-            <span>Siswa Bertahan: <strong className="text-white text-base">{remainingStudents}</strong> / {initialStudentsCount}</span>
-          </div>
+        {/* Surviving / Active Students Indicator during Game */}
+        {currentScreen === 'game' && (
+          gameMode === 'free' ? (
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-300 font-black text-sm shadow-md">
+              <Sparkles size={16} className="text-sky-400" />
+              <span>Mode Bebas: <strong className="text-white text-base">{initialStudentsCount}</strong> Siswa (Semua Soal)</span>
+            </div>
+          ) : (
+            remainingStudents !== undefined && (
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border border-amber-500/40 text-amber-300 font-black text-sm shadow-md animate-pulse">
+                <Users size={16} className="text-amber-400" />
+                <span>Siswa Bertahan: <strong className="text-white text-base">{remainingStudents}</strong> / {initialStudentsCount}</span>
+              </div>
+            )
+          )
         )}
 
         {/* Active Set Name */}

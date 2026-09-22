@@ -132,6 +132,53 @@ export function useAudioSFX(soundEnabled = true) {
     playBeep(987.77, 'sine', 0.28, 0.22);
   }, [playBeep]);
 
+  // Jump instruction cue: energetic dual sound + speech synthesis "Lompat!"
+  const playJumpCue = useCallback(() => {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getAudioContext();
+      if (ctx) {
+        // High energetic alert whistle
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(1174.66, ctx.currentTime + 0.18);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+        osc2.frequency.linearRampToValueAtTime(1480, ctx.currentTime + 0.38);
+        gain2.gain.setValueAtTime(0.35, ctx.currentTime + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(ctx.currentTime + 0.15);
+        osc2.stop(ctx.currentTime + 0.45);
+      }
+
+      // Voice prompt "Lompat!" via SpeechSynthesis if available
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance("Lompat!");
+          utter.lang = 'id-ID';
+          utter.rate = 1.3;
+          utter.pitch = 1.3;
+          utter.volume = 1.0;
+          window.speechSynthesis.speak(utter);
+        } catch (err) {}
+      }
+    } catch (e) {}
+  }, [soundEnabled, getAudioContext]);
+
   // Fanfare for winner / last standing
   const playFanfare = useCallback(() => {
     if (!soundEnabled) return;
@@ -183,6 +230,7 @@ export function useAudioSFX(soundEnabled = true) {
     playEliminationSiren,
     playSafeChime,
     playWhistle,
+    playJumpCue,
     playFanfare
   }), [
     playTick,
@@ -191,6 +239,7 @@ export function useAudioSFX(soundEnabled = true) {
     playEliminationSiren,
     playSafeChime,
     playWhistle,
+    playJumpCue,
     playFanfare
   ]);
 }

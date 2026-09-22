@@ -45,6 +45,9 @@ export function loadGameSettings() {
     console.error('Failed to load settings', e);
   }
   return {
+    initialStudentsCount: 20,
+    survivorTarget: 1,
+    gameMode: 'free', // 'free' | 'elimination'
     playerCount: 2,
     playerNames: ['Pemain 1', 'Pemain 2', 'Pemain 3', 'Pemain 4'],
     timerOverride: null, // null means use set default

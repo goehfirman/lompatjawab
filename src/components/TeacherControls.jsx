@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Play, Pause, FastForward, RotateCcw, CheckCircle, 
-  Users, LogOut, Minus, Plus 
+  Users, LogOut, Minus, Plus, Sparkles, Footprints 
 } from 'lucide-react';
 
 export function TeacherControls({
@@ -16,36 +16,51 @@ export function TeacherControls({
   initialStudentsCount,
   onAdjustRemaining,
   onNextQuestion,
-  isLastQuestion
+  isLastQuestion,
+  gameMode = 'free',
+  isJumping = false
 }) {
+  const isFreeMode = gameMode === 'free';
+
   return (
     <footer className="h-20 px-6 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-between z-30 shrink-0 gap-4">
       {/* Left: Remaining Students Touch Adjuster */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-800/90 border border-slate-700">
-          <Users size={18} className="text-amber-400" />
-          <span className="text-xs font-bold text-slate-300">
-            Siswa Bertahan: <strong className="text-emerald-400 text-base font-black">{remainingStudents}</strong> / {initialStudentsCount}
-          </span>
-        </div>
+        {isFreeMode ? (
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-sky-950/60 border border-sky-500/40 shadow-sm">
+            <Sparkles size={18} className="text-sky-400" />
+            <span className="text-xs font-bold text-sky-200">
+              Mode Bebas: <strong className="text-white text-base font-black">{initialStudentsCount}</strong> Siswa (Semua Soal)
+            </span>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-800/90 border border-slate-700">
+              <Users size={18} className="text-amber-400" />
+              <span className="text-xs font-bold text-slate-300">
+                Siswa Bertahan: <strong className="text-emerald-400 text-base font-black">{remainingStudents}</strong> / {initialStudentsCount}
+              </span>
+            </div>
 
-        {/* Quick touch buttons for teacher */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => onAdjustRemaining(Math.max(1, remainingStudents - 1))}
-            className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 border border-slate-700 font-black flex items-center justify-center transition active:scale-95"
-            title="Kurangi 1 Siswa yang Tereliminasi"
-          >
-            <Minus size={18} />
-          </button>
-          <button
-            onClick={() => onAdjustRemaining(remainingStudents + 1)}
-            className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 font-black flex items-center justify-center transition active:scale-95"
-            title="Tambah 1 Siswa"
-          >
-            <Plus size={18} />
-          </button>
-        </div>
+            {/* Quick touch buttons for teacher in elimination mode */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onAdjustRemaining(Math.max(1, remainingStudents - 1))}
+                className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 border border-slate-700 font-black flex items-center justify-center transition active:scale-95"
+                title="Kurangi 1 Siswa yang Tereliminasi"
+              >
+                <Minus size={18} />
+              </button>
+              <button
+                onClick={() => onAdjustRemaining(remainingStudents + 1)}
+                className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 font-black flex items-center justify-center transition active:scale-95"
+                title="Tambah 1 Siswa"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Right: Teacher Quick Action Buttons (Touch target >= 48px) */}
@@ -56,12 +71,19 @@ export function TeacherControls({
             onClick={onNextQuestion}
             className="h-12 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-sm flex items-center gap-2 shadow-xl shadow-emerald-500/30 transition active:scale-95 animate-bounce-short"
           >
-            <span>{isLastQuestion ? 'Lihat Juara Bertahan 🏆' : 'Soal Berikutnya ➜'}</span>
+            <span>{isLastQuestion ? (isFreeMode ? 'Selesai & Lihat Rekap 🌟' : 'Lihat Juara Bertahan 🏆') : 'Soal Berikutnya ➜'}</span>
           </button>
         )}
 
-        {/* Early Reveal */}
-        {!isTimerFinished && (
+        {/* Jumping indicator or Early Reveal */}
+        {!isTimerFinished && isJumping && (
+          <div className="h-12 px-5 rounded-2xl bg-amber-500 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg shadow-amber-500/30 animate-pulse">
+            <Footprints size={18} />
+            <span>Siswa Sedang Lompat...</span>
+          </div>
+        )}
+
+        {!isTimerFinished && !isJumping && (
           <button
             onClick={onRevealEarly}
             className="h-12 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition active:scale-95"

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { Trophy, Medal, RotateCcw, Users, Home, Award, ShieldCheck, Flame, X } from 'lucide-react';
+import { Trophy, Medal, RotateCcw, Users, Home, Award, ShieldCheck, Flame, X, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export function FinalScore({
   initialStudentsCount,
@@ -10,8 +10,10 @@ export function FinalScore({
   questions,
   roundEliminations = [],
   onPlayAgain,
-  onBackToMenu
+  onBackToMenu,
+  gameMode = 'free'
 }) {
+  const isFreeMode = gameMode === 'free';
   const eliminatedTotal = initialStudentsCount - remainingStudents;
 
   // Fire celebratory confetti
@@ -48,68 +50,120 @@ export function FinalScore({
       {/* Header Banner */}
       <div className="text-center space-y-3 pt-2">
         <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-300 font-black text-sm tracking-wider uppercase shadow-xl animate-bounce-short">
-          <Trophy size={20} className="text-amber-400" />
-          PERMAINAN SELESAI — SELAMAT KEPADA SELURUH JUARA BERTAHAN!
+          {isFreeMode ? <Sparkles size={20} className="text-amber-400" /> : <Trophy size={20} className="text-amber-400" />}
+          {isFreeMode 
+            ? 'PERMAINAN SELESAI — SEMUA SOAL BERHASIL DISELESAIKAN!' 
+            : 'PERMAINAN SELESAI — SELAMAT KEPADA SELURUH JUARA BERTAHAN!'}
         </div>
         <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight">
-          Juara Bertahan Kuis
+          {isFreeMode ? 'Kuis Selesai: Mode Bebas' : 'Juara Bertahan Kuis'}
         </h1>
         <p className="text-slate-300 font-medium text-base max-w-xl mx-auto">
-          Luar biasa! Setelah melewati rintangan soal demi soal dan melompat tepat ke zona yang benar, berikut adalah hasil akhir kelas:
+          {isFreeMode
+            ? 'Luar biasa! Seluruh kelas berhasil menjawab seluruh rangkaian soal sampai habis tanpa tereliminasi!'
+            : 'Luar biasa! Setelah melewati rintangan soal demi soal dan melompat tepat ke zona yang benar, berikut adalah hasil akhir kelas:'}
         </p>
       </div>
 
       {/* Class Statistics Scorecards */}
       <div className="max-w-4xl mx-auto w-full grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {/* Surviving Champions */}
-        <div className="p-6 rounded-3xl bg-gradient-to-b from-emerald-950/80 to-slate-900 border-2 border-emerald-500 shadow-2xl shadow-emerald-500/25 flex flex-col items-center text-center">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center font-black text-2xl mb-3 shadow-lg shadow-emerald-500/40">
-            <Trophy size={28} />
-          </div>
-          <span className="text-xs font-black text-emerald-400 uppercase tracking-wider">
-            Juara Bertahan Lolos
-          </span>
-          <div className="text-5xl font-black text-white my-1">
-            {remainingStudents}
-          </div>
-          <span className="text-xs text-slate-400 font-semibold">Siswa Berhasil Lolos</span>
-        </div>
+        {isFreeMode ? (
+          <>
+            {/* Total Questions Completed */}
+            <div className="p-6 rounded-3xl bg-gradient-to-b from-sky-950/80 to-slate-900 border-2 border-sky-500 shadow-2xl shadow-sky-500/25 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-2xl bg-sky-500 text-white flex items-center justify-center font-black text-2xl mb-3 shadow-lg shadow-sky-500/40">
+                <CheckCircle2 size={28} />
+              </div>
+              <span className="text-xs font-black text-sky-400 uppercase tracking-wider">
+                Total Soal Selesai
+              </span>
+              <div className="text-5xl font-black text-white my-1">
+                {questions.length}
+              </div>
+              <span className="text-xs text-slate-400 font-semibold">Semua Soal Tuntas</span>
+            </div>
 
-        {/* Total Class Participants */}
-        <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col items-center text-center">
-          <div className="w-14 h-14 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-black text-2xl mb-3 border border-sky-500/30">
-            <Users size={28} />
-          </div>
-          <span className="text-xs font-black text-sky-400 uppercase tracking-wider">
-            Total Siswa Peserta
-          </span>
-          <div className="text-5xl font-black text-white my-1">
-            {initialStudentsCount}
-          </div>
-          <span className="text-xs text-slate-400 font-semibold">Peserta di Awal Kuis</span>
-        </div>
+            {/* Total Class Participants */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-2xl mb-3 border border-emerald-500/30">
+                <Users size={28} />
+              </div>
+              <span className="text-xs font-black text-emerald-400 uppercase tracking-wider">
+                Total Siswa Aktif
+              </span>
+              <div className="text-5xl font-black text-white my-1">
+                {initialStudentsCount}
+              </div>
+              <span className="text-xs text-slate-400 font-semibold">Ikut Serta Penuh</span>
+            </div>
 
-        {/* Total Eliminated */}
-        <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col items-center text-center">
-          <div className="w-14 h-14 rounded-2xl bg-rose-600/20 text-rose-400 flex items-center justify-center font-black text-2xl mb-3 border border-rose-500/30">
-            <X size={28} />
-          </div>
-          <span className="text-xs font-black text-rose-400 uppercase tracking-wider">
-            Siswa Tereliminasi
-          </span>
-          <div className="text-5xl font-black text-white my-1">
-            {eliminatedTotal}
-          </div>
-          <span className="text-xs text-slate-400 font-semibold">Gugur Selama Kuis</span>
-        </div>
+            {/* 100% Completed Status */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-2xl mb-3 border border-amber-500/30">
+                <Sparkles size={28} />
+              </div>
+              <span className="text-xs font-black text-amber-400 uppercase tracking-wider">
+                Status Mode
+              </span>
+              <div className="text-4xl font-black text-white my-2">
+                100% Tuntas
+              </div>
+              <span className="text-xs text-slate-400 font-semibold">Tanpa Batas Eliminasi</span>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Surviving Champions */}
+            <div className="p-6 rounded-3xl bg-gradient-to-b from-emerald-950/80 to-slate-900 border-2 border-emerald-500 shadow-2xl shadow-emerald-500/25 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center font-black text-2xl mb-3 shadow-lg shadow-emerald-500/40">
+                <Trophy size={28} />
+              </div>
+              <span className="text-xs font-black text-emerald-400 uppercase tracking-wider">
+                Juara Bertahan Lolos
+              </span>
+              <div className="text-5xl font-black text-white my-1">
+                {remainingStudents}
+              </div>
+              <span className="text-xs text-slate-400 font-semibold">Siswa Berhasil Lolos</span>
+            </div>
+
+            {/* Total Class Participants */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-black text-2xl mb-3 border border-sky-500/30">
+                <Users size={28} />
+              </div>
+              <span className="text-xs font-black text-sky-400 uppercase tracking-wider">
+                Total Siswa Peserta
+              </span>
+              <div className="text-5xl font-black text-white my-1">
+                {initialStudentsCount}
+              </div>
+              <span className="text-xs text-slate-400 font-semibold">Peserta di Awal Kuis</span>
+            </div>
+
+            {/* Total Eliminated */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-2xl bg-rose-600/20 text-rose-400 flex items-center justify-center font-black text-2xl mb-3 border border-rose-500/30">
+                <X size={28} />
+              </div>
+              <span className="text-xs font-black text-rose-400 uppercase tracking-wider">
+                Siswa Tereliminasi
+              </span>
+              <div className="text-5xl font-black text-white my-1">
+                {eliminatedTotal}
+              </div>
+              <span className="text-xs text-slate-400 font-semibold">Gugur Selama Kuis</span>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Round-by-Round Elimination History */}
+      {/* Round-by-Round History */}
       <div className="max-w-4xl mx-auto w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-extrabold text-lg text-white flex items-center gap-2">
             <Award size={22} className="text-amber-400" />
-            Rekap Babak Eliminasi per Soal
+            {isFreeMode ? 'Rekap Pembahasan Setiap Soal' : 'Rekap Babak Eliminasi per Soal'}
           </h2>
           <span className="text-xs text-slate-400 font-semibold">
             {questions.length} Soal Dimainkan
@@ -135,7 +189,7 @@ export function FinalScore({
                     </h3>
                   </div>
                   <div className="text-xs text-slate-400 flex items-center gap-3 pl-9">
-                    <span>Zona Aman: <strong className="text-emerald-400 font-bold">Zona {q.correctAnswer}</strong></span>
+                    <span>Zona Benar: <strong className="text-emerald-400 font-bold">Zona {q.correctAnswer}</strong></span>
                     {q.explanation && (
                       <span className="italic truncate max-w-sm text-slate-500 hidden md:inline">
                         ({q.explanation})
@@ -145,14 +199,25 @@ export function FinalScore({
                 </div>
 
                 <div className="flex items-center gap-4 pl-9 sm:pl-0 shrink-0">
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-rose-400 block">
-                      -{roundData.eliminatedCount} Siswa Gugur
-                    </span>
-                    <span className="text-[11px] text-slate-400 font-semibold">
-                      Tersisa {roundData.remainingAfter} Anak
-                    </span>
-                  </div>
+                  {isFreeMode ? (
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-emerald-400 block">
+                        Semua Siswa Ikut Serta
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-semibold">
+                        {initialStudentsCount} Peserta Aktif
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-rose-400 block">
+                        -{roundData.eliminatedCount} Siswa Gugur
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-semibold">
+                        Tersisa {roundData.remainingAfter} Anak
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             );

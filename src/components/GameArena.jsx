@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Pause, AlertTriangle, Sparkles, ShieldCheck, X, ArrowRight } from 'lucide-react';
+import { Clock, Pause, AlertTriangle, Sparkles, ShieldCheck, X, ArrowRight, ArrowLeft, Footprints } from 'lucide-react';
 import { TeacherControls } from './TeacherControls';
 
 export function GameArena({
@@ -13,7 +13,7 @@ export function GameArena({
   onRequestCamera
 }) {
   const { questions, timerSeconds = 10, randomizeQuestions, shuffleChoices } = questionSet;
-  const { initialStudentsCount = 20, survivorTarget = 1 } = settings;
+  const { initialStudentsCount = 20, survivorTarget = 1, gameMode = 'free' } = settings;
 
   // Prepare questions
   const [gameQuestions, setGameQuestions] = useState(() => {
@@ -41,6 +41,8 @@ export function GameArena({
   const [countdownStart, setCountdownStart] = useState(3); // 3, 2, 1, 0
   const [timeLeft, setTimeLeft] = useState(timerSeconds);
   const [isPaused, setIsPaused] = useState(false);
+  const [isJumping, setIsJumping] = useState(false); // 2-second jumping phase after countdown
+  const [jumpTimeLeft, setJumpTimeLeft] = useState(2);
   const [isRevealed, setIsRevealed] = useState(false);
   const [remainingStudents, setRemainingStudents] = useState(initialStudentsCount);
   const [roundEliminations, setRoundEliminations] = useState([]); // [{ questionIndex, correctZone, eliminatedCount, remainingAfter }]
@@ -73,13 +75,13 @@ export function GameArena({
 
   // Main question timer
   useEffect(() => {
-    if (countdownStart > 0 || isPaused || isRevealed) return;
+    if (countdownStart > 0 || isPaused || isRevealed || isJumping) return;
 
     timerIntervalRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timerIntervalRef.current);
-          handleLockAnswers();
+          startJumpPhase();
           return 0;
         }
 
@@ -94,31 +96,77 @@ export function GameArena({
     }, 1000);
 
     return () => clearInterval(timerIntervalRef.current);
-  }, [countdownStart, isPaused, isRevealed]);
+  }, [countdownStart, isPaused, isRevealed, isJumping]);
 
-  // Lock answers and eliminate the wrong zone
+  // Trigger 2-second jumping phase after countdown reaches 0 (after 1)
+  const startJumpPhase = () => {
+    setTimeLeft(0);
+    setIsJumping(true);
+    setJumpTimeLeft(2);
+    audioRef.current?.playJumpCue();
+  };
+
+  // 2-Second Jump Countdown Effect: reveals answer once time expires
+  useEffect(() => {
+    if (!isJumping) return;
+
+    let seconds = 2;
+    const jumpInterval = setInterval(() => {
+      seconds -= 1;
+      if (seconds > 0) {
+        setJumpTimeLeft(seconds);
+      } else {
+        clearInterval(jumpInterval);
+        setIsJumping(false);
+        handleLockAnswers();
+      }
+    }, 1000);
+
+    return () => clearInterval(jumpInterval);
+  }, [isJumping]);
+
+  // Lock answers and evaluate zones
   const handleLockAnswers = () => {
     audioRef.current?.playWhistle();
 
-    // Sound siren for wrong zone and safe chime for correct zone
-    setTimeout(() => {
-      audioRef.current?.playEliminationSiren();
-    }, 300);
+    const isFreeMode = gameMode === 'free';
 
-    setTimeout(() => {
-      audioRef.current?.playSafeChime();
-    }, 1000);
+    // Sound effects: in free mode, celebrate without harsh elimination siren
+    if (!isFreeMode) {
+      setTimeout(() => {
+        audioRef.current?.playEliminationSiren();
+      }, 300);
+      setTimeout(() => {
+        audioRef.current?.playSafeChime();
+      }, 1000);
+    } else {
+      setTimeout(() => {
+        audioRef.current?.playSafeChime();
+      }, 400);
+    }
 
-    // Estimate eliminated students based on crowd density or conservative drop
+    // Estimate participants based on crowd density
     const correctZone = currentQ.correctAnswer;
     const estimatedWrongPct = correctZone === 'A' ? (crowdDensity.pctB / 100) : (crowdDensity.pctA / 100);
+    const estimatedCorrectPct = correctZone === 'A' ? (crowdDensity.pctA / 100) : (crowdDensity.pctB / 100);
     
-    // Estimate students who picked wrong side (at least 1 if remaining > 1, max remaining - 1)
-    let estimatedEliminated = Math.round(remainingStudents * Math.max(0.15, Math.min(0.85, estimatedWrongPct)));
-    if (estimatedEliminated >= remainingStudents) {
-      estimatedEliminated = remainingStudents - 1;
+    let estimatedEliminated = 0;
+    let newRemaining = initialStudentsCount;
+
+    if (!isFreeMode) {
+      // Elimination mode: reduce surviving students
+      estimatedEliminated = Math.round(remainingStudents * Math.max(0.15, Math.min(0.85, estimatedWrongPct)));
+      if (estimatedEliminated >= remainingStudents) {
+        estimatedEliminated = remainingStudents - 1;
+      }
+      newRemaining = Math.max(1, remainingStudents - estimatedEliminated);
+      setRemainingStudents(newRemaining);
+    } else {
+      // Free mode: no elimination! All students continue playing
+      const correctCount = Math.round(initialStudentsCount * Math.max(0.1, Math.min(0.95, estimatedCorrectPct)));
+      estimatedEliminated = initialStudentsCount - correctCount;
+      newRemaining = initialStudentsCount;
     }
-    const newRemaining = Math.max(1, remainingStudents - estimatedEliminated);
 
     setRoundEliminations(prev => [
       ...prev,
@@ -126,24 +174,30 @@ export function GameArena({
         questionIndex: currentQuestionIndex,
         correctZone,
         eliminatedCount: estimatedEliminated,
-        remainingAfter: newRemaining
+        remainingAfter: newRemaining,
+        isFreeMode
       }
     ]);
 
-    setRemainingStudents(newRemaining);
     setIsRevealed(true);
   };
 
-  // Next question or finish
+  // Next question or finish (Mode Bebas ONLY finishes when all questions are answered)
   const handleNextQuestion = () => {
     setIsRevealed(false);
+    setIsJumping(false);
+    setJumpTimeLeft(2);
 
-    // If remaining students is at or below target (e.g. 1 or 3) or questions finished
-    if (remainingStudents <= survivorTarget || currentQuestionIndex + 1 >= gameQuestions.length) {
+    const isLastQuestion = currentQuestionIndex + 1 >= gameQuestions.length;
+    const isEliminationFinished = gameMode !== 'free' && remainingStudents <= survivorTarget;
+
+    // In Mode Bebas: game continues until all questions are exhausted!
+    if (isLastQuestion || isEliminationFinished) {
       onFinishGame({
         initialStudentsCount,
         survivorTarget,
-        remainingStudents,
+        gameMode,
+        remainingStudents: gameMode === 'free' ? initialStudentsCount : remainingStudents,
         totalQuestions: gameQuestions.length,
         questions: gameQuestions,
         roundEliminations
@@ -162,23 +216,36 @@ export function GameArena({
 
   const handleRepeatQuestion = () => {
     setIsRevealed(false);
+    setIsJumping(false);
+    setJumpTimeLeft(2);
     setTimeLeft(timerSeconds);
+  };
+
+  // Early reveal action by teacher: triggers jump instruction or forces reveal
+  const handleEarlyReveal = () => {
+    if (!isRevealed && !isJumping) {
+      clearInterval(timerIntervalRef.current);
+      startJumpPhase();
+    } else if (isJumping) {
+      setIsJumping(false);
+      handleLockAnswers();
+    }
   };
 
   // Keyboard shortcut for fast teacher control
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === ' ' && !isRevealed) {
+      if (e.key === ' ' && !isRevealed && !isJumping) {
         e.preventDefault();
         setIsPaused(p => !p);
-      } else if (e.key === 'Enter' && !isRevealed && timeLeft > 0) {
+      } else if (e.key === 'Enter' && !isRevealed) {
         e.preventDefault();
-        handleLockAnswers();
+        handleEarlyReveal();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isRevealed, timeLeft]);
+  }, [isRevealed, isJumping, timeLeft]);
 
   const timerPct = (timeLeft / timerSeconds) * 100;
   const isUrgent = timeLeft <= 5 && timeLeft > 0;
@@ -208,9 +275,15 @@ export function GameArena({
                 <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-extrabold text-[11px] border border-amber-500/30">
                   SOAL {currentQuestionIndex + 1} / {gameQuestions.length}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-300 hidden sm:inline">
-                  Siswa Bertahan: <strong className="text-emerald-400 font-bold">{remainingStudents}</strong>
-                </span>
+                {gameMode === 'free' ? (
+                  <span className="px-2.5 py-0.5 rounded-lg bg-sky-500/20 text-sky-300 font-bold text-[11px] border border-sky-500/30 flex items-center gap-1">
+                    <Sparkles size={12} className="text-sky-400" /> Mode Bebas ({initialStudentsCount} Siswa)
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-semibold text-slate-300 hidden sm:inline">
+                    Siswa Bertahan: <strong className="text-emerald-400 font-bold">{remainingStudents}</strong> / {initialStudentsCount}
+                  </span>
+                )}
               </div>
 
               {/* Compact Timer Pill */}
@@ -250,7 +323,7 @@ export function GameArena({
         </div>
 
         {/* Translucent 5-Second Center Countdown Overlay */}
-        {!isRevealed && countdownStart === 0 && timeLeft <= 5 && timeLeft > 0 && (
+        {!isRevealed && !isJumping && countdownStart === 0 && timeLeft <= 5 && timeLeft > 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-30">
             <div
               key={timeLeft}
@@ -272,8 +345,58 @@ export function GameArena({
                   timeLeft <= 2 ? 'text-rose-200/90' : 'text-amber-200/90'
                 }`}
               >
-                {timeLeft === 1 ? 'WAKTU HABIS!' : 'DETIK LAGI!'}
+                {timeLeft === 1 ? 'SIAP-SIAP LOMPAT!' : 'DETIK LAGI!'}
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* "LOMPAT!" 2-Second Jump Instruction Overlay (Suspense before answer reveals) */}
+        {isJumping && !isRevealed && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-40 bg-slate-950/70 backdrop-blur-[3px] animate-fadeIn pointer-events-none">
+            <div className="relative flex flex-col items-center max-w-xl mx-4 text-center">
+              {/* Pulsing ambient glow */}
+              <div className="absolute -inset-8 bg-gradient-to-r from-amber-500/30 via-rose-500/30 to-sky-500/30 blur-3xl animate-pulse rounded-full" />
+
+              <div className="relative flex flex-col items-center p-6 sm:p-8 rounded-3xl bg-slate-950/95 border-4 border-amber-400 shadow-[0_0_100px_rgba(245,158,11,0.75)] animate-jumpPulse w-full">
+                {/* Top Alert Badge */}
+                <div className="px-4 py-1.5 rounded-full bg-amber-500 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-widest mb-3 flex items-center gap-2 shadow-md">
+                  <Footprints size={18} className="animate-bounce" />
+                  <span>WAKTU HABIS! KUNCI PILIHAN</span>
+                </div>
+
+                {/* Massive Animated Text: LOMPAT! */}
+                <h1 className="text-7xl sm:text-8xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-rose-500 tracking-tight drop-shadow-[0_8px_32px_rgba(245,158,11,0.9)] animate-pulse leading-none">
+                  LOMPAT!
+                </h1>
+
+                {/* Clear Subtitle */}
+                <p className="text-base sm:text-xl font-black text-white mt-3 drop-shadow">
+                  Melompat ke Sisi Pilihanmu Sekarang! 🏃‍♂️💨
+                </p>
+
+                {/* 2-Second Visual Countdown Gauge */}
+                <div className="mt-4 flex items-center gap-3 px-6 py-2 rounded-2xl bg-slate-900/90 border border-amber-400/50 shadow-inner">
+                  <span className="text-xs font-extrabold text-slate-300 uppercase tracking-wider">
+                    Jawaban Terbuka Dalam:
+                  </span>
+                  <span className="text-3xl font-black font-mono text-amber-400 animate-pulse">
+                    {jumpTimeLeft}s
+                  </span>
+                </div>
+
+                {/* Visual Directional Zones */}
+                <div className="w-full flex items-center justify-between mt-5 pt-4 border-t border-slate-800/80 text-xs sm:text-sm font-black">
+                  <div className="flex items-center gap-2 text-sky-400">
+                    <ArrowLeft size={18} className="animate-pulse" />
+                    <span>ZONA A (KIRI)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-amber-400">
+                    <span>ZONA B (KANAN)</span>
+                    <ArrowRight size={18} className="animate-pulse" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -313,7 +436,7 @@ export function GameArena({
                       : 'text-sky-400'
                   }`}>
                     {isRevealed
-                      ? (currentQ.correctAnswer === 'A' ? 'JAWABAN BENAR' : 'TERELIMINASI')
+                      ? (currentQ.correctAnswer === 'A' ? 'JAWABAN BENAR' : (gameMode === 'free' ? 'JAWABAN SALAH' : 'TERELIMINASI'))
                       : 'PILIHAN A'}
                   </span>
                   <span className="text-[10px] text-slate-300 font-bold">
@@ -332,12 +455,12 @@ export function GameArena({
                 {currentQ.correctAnswer === 'A' ? (
                   <div className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-emerald-200 shadow-emerald-500/60">
                     <ShieldCheck size={20} />
-                    <span>ZONA A BENAR (LOLOS)</span>
+                    <span>ZONA A BENAR {gameMode === 'free' ? '(BENAR!)' : '(LOLOS)'}</span>
                   </div>
                 ) : (
-                  <div className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-rose-200 shadow-rose-600/60 animate-pulse">
+                  <div className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-rose-200 shadow-rose-600/60">
                     <X size={20} />
-                    <span>ZONA A SALAH (GUGUR)</span>
+                    <span>ZONA A SALAH {gameMode === 'free' ? '(TETAP MAIN)' : '(GUGUR)'}</span>
                   </div>
                 )}
               </div>
@@ -373,7 +496,7 @@ export function GameArena({
                       : 'text-amber-400'
                   }`}>
                     {isRevealed
-                      ? (currentQ.correctAnswer === 'B' ? 'JAWABAN BENAR' : 'TERELIMINASI')
+                      ? (currentQ.correctAnswer === 'B' ? 'JAWABAN BENAR' : (gameMode === 'free' ? 'JAWABAN SALAH' : 'TERELIMINASI'))
                       : 'PILIHAN B'}
                   </span>
                   <span className="text-[10px] text-slate-300 font-bold">
@@ -401,12 +524,12 @@ export function GameArena({
                 {currentQ.correctAnswer === 'B' ? (
                   <div className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-emerald-200 shadow-emerald-500/60">
                     <ShieldCheck size={20} />
-                    <span>ZONA B BENAR (LOLOS)</span>
+                    <span>ZONA B BENAR {gameMode === 'free' ? '(BENAR!)' : '(LOLOS)'}</span>
                   </div>
                 ) : (
-                  <div className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-rose-200 shadow-rose-600/60 animate-pulse">
+                  <div className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-black text-sm flex items-center gap-2 shadow-2xl border-2 border-rose-200 shadow-rose-600/60">
                     <X size={20} />
-                    <span>ZONA B SALAH (GUGUR)</span>
+                    <span>ZONA B SALAH {gameMode === 'free' ? '(TETAP MAIN)' : '(GUGUR)'}</span>
                   </div>
                 )}
               </div>
@@ -435,7 +558,7 @@ export function GameArena({
               onClick={handleNextQuestion}
               className="h-14 px-8 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-95 text-white font-black text-base flex items-center gap-2.5 shadow-xl shadow-emerald-500/30 transition active:scale-95 animate-bounce-short border border-white/20"
             >
-              <span>{currentQuestionIndex + 1 < gameQuestions.length ? 'Lanjut ke Soal Berikutnya' : 'Lihat Juara Bertahan'}</span>
+              <span>{currentQuestionIndex + 1 < gameQuestions.length ? 'Lanjut ke Soal Berikutnya' : (gameMode === 'free' ? 'Selesai & Lihat Rekap Kuis' : 'Lihat Juara Bertahan')}</span>
               <ArrowRight size={20} />
             </button>
           </div>
@@ -446,7 +569,7 @@ export function GameArena({
       <TeacherControls
         isPaused={isPaused}
         onTogglePause={() => setIsPaused(p => !p)}
-        onRevealEarly={handleLockAnswers}
+        onRevealEarly={handleEarlyReveal}
         onSkipQuestion={handleSkipQuestion}
         onRepeatQuestion={handleRepeatQuestion}
         onQuitToMenu={onQuitToMenu}
@@ -456,6 +579,8 @@ export function GameArena({
         onAdjustRemaining={setRemainingStudents}
         onNextQuestion={handleNextQuestion}
         isLastQuestion={currentQuestionIndex + 1 >= gameQuestions.length}
+        gameMode={gameMode}
+        isJumping={isJumping}
       />
     </div>
   );

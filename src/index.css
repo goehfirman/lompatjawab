@@ -64,3 +64,17 @@
 .animate-countdownPop {
   animation: countdownPop 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+@keyframes jumpPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.animate-jumpPulse {
+  animation: jumpPulse 0.6s ease-in-out infinite;
+}
+
