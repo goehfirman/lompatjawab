@@ -1,0 +1,273 @@
+import React from 'react';
+import { 
+  Users, ShieldAlert, Video, Play, AlertCircle, RefreshCw, 
+  Flame, Sparkles, Footprints, Trophy, Camera 
+} from 'lucide-react';
+
+export function Calibration({
+  activeSet,
+  settings,
+  onUpdateSettings,
+  onStartCountdown,
+  isCameraReady,
+  cameraError,
+  onRequestCamera,
+  crowdDensity,
+  fps
+}) {
+  const { 
+    initialStudentsCount = 20, 
+    survivorTarget = 1, 
+    motionMode = 'jump', 
+    timerOverride 
+  } = settings;
+
+  const handleStudentsCountChange = (count) => {
+    onUpdateSettings({ ...settings, initialStudentsCount: Math.max(2, count) });
+  };
+
+  return (
+    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-950 text-slate-100 p-6 gap-6 relative z-10">
+      {/* Left: Interactive Class Camera Alignment & Live Crowd Test */}
+      <div className="flex-1 flex flex-col bg-slate-900/80 backdrop-blur border border-slate-800 rounded-3xl p-5 relative overflow-hidden">
+        <div className="flex items-center justify-between mb-3 z-20">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-emerald-500 animate-ping" />
+            <h2 className="font-extrabold text-xl text-white">Area Kamera Seluruh Kelas</h2>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-800/80 font-mono text-slate-300">
+              {fps} FPS
+            </span>
+            {!isCameraReady && (
+              <button
+                onClick={onRequestCamera}
+                className="text-xs px-3 py-1.5 rounded-xl font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-1.5 shadow"
+              >
+                <Camera size={14} /> Izinkan Kamera
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Viewport Frame with Overlay */}
+        <div className="relative flex-1 bg-black/40 rounded-2xl overflow-hidden border-2 border-slate-700/60 flex items-center justify-center min-h-[360px]">
+          {/* Top Zone Labels */}
+          <div className="absolute inset-x-0 top-4 flex justify-between px-6 pointer-events-none z-20">
+            <div className="bg-sky-500/90 text-white font-extrabold text-lg px-4 py-1.5 rounded-xl shadow-lg border border-sky-300">
+              <span>ZONA A (KIRI)</span>
+            </div>
+            <div className="bg-amber-500/90 text-white font-extrabold text-lg px-4 py-1.5 rounded-xl shadow-lg border border-amber-300">
+              <span>ZONA B (KANAN)</span>
+            </div>
+          </div>
+
+          {/* Interactive Crowd Density Bar at Bottom of Camera */}
+          <div className="absolute bottom-6 inset-x-8 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-700 p-3.5 rounded-2xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm text-sky-400">Kepadatan Zona A:</span>
+              <span className="font-mono font-black text-base text-white">{crowdDensity.pctA}%</span>
+            </div>
+
+            {/* Visual Balance Bar */}
+            <div className="flex-1 h-3 rounded-full bg-slate-800 overflow-hidden flex">
+              <div className="bg-sky-500 transition-all duration-300" style={{ width: `${crowdDensity.pctA}%` }} />
+              <div className="bg-amber-500 transition-all duration-300" style={{ width: `${crowdDensity.pctB}%` }} />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm text-amber-400">Kepadatan Zona B:</span>
+              <span className="font-mono font-black text-base text-white">{crowdDensity.pctB}%</span>
+            </div>
+          </div>
+
+          {/* Camera Error Message Overlay */}
+          {cameraError && (
+            <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-30 space-y-4">
+              <AlertCircle size={48} className="text-amber-400" />
+              <div className="max-w-md space-y-1">
+                <h3 className="font-bold text-lg text-white">Kamera Belum Aktif di Layar</h3>
+                <p className="text-sm text-slate-400">{cameraError}</p>
+              </div>
+              <button
+                onClick={onRequestCamera}
+                className="px-6 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-sm shadow-xl shadow-sky-500/30 flex items-center gap-2"
+              >
+                <RefreshCw size={18} /> Coba Sambungkan Kamera Lagi
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Live instructions */}
+        <div className="mt-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-between text-xs text-slate-300">
+          <span>
+            💡 <strong>Panduan:</strong> Minta seluruh siswa berdiri di depan kamera PID. Siswa dapat bergerak ke sisi kiri (A) atau kanan (B) untuk mencoba batas zona sebelum kuis dimulai.
+          </span>
+        </div>
+      </div>
+
+      {/* Right Sidebar: Mass Battle Royale Settings */}
+      <div className="w-full lg:w-96 flex flex-col gap-5 shrink-0">
+        {/* Safety Guidelines */}
+        <div className="p-4 rounded-3xl bg-amber-950/40 border border-amber-600/40 text-amber-200 space-y-2">
+          <div className="flex items-center gap-2 font-black text-sm text-amber-300">
+            <ShieldAlert size={18} />
+            ATURAN KESELAMATAN KELAS
+          </div>
+          <ul className="text-xs space-y-1 text-amber-200/90 list-disc list-inside">
+            <li>Bersihkan lantai dari tas dan rintangan meja/kursi.</li>
+            <li>Siswa melompat atau berpindah dengan tertib tanpa saling mendorong.</li>
+            <li>Siswa yang tereliminasi langsung berjalan ke pinggir arena / duduk.</li>
+          </ul>
+        </div>
+
+        {/* Settings Form */}
+        <div className="flex-1 bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-5 overflow-y-auto">
+          {/* Active Set Info */}
+          <div>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+              Set Kuis Terpilih
+            </span>
+            <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+              <h3 className="font-black text-white text-base leading-tight">{activeSet.title}</h3>
+              <p className="text-xs text-sky-400 font-semibold mt-1">
+                {activeSet.subject} • {activeSet.questions.length} Soal • {activeSet.timerSeconds} dtk/soal
+              </p>
+            </div>
+          </div>
+
+          {/* Initial Class Size (Jumlah Siswa Awal) */}
+          <div>
+            <label className="text-xs font-bold text-slate-300 flex items-center justify-between mb-2">
+              <span className="flex items-center gap-1.5">
+                <Users size={16} className="text-amber-400" /> Jumlah Siswa Peserta
+              </span>
+              <span className="text-amber-400 font-black text-lg">{initialStudentsCount} Siswa</span>
+            </label>
+            
+            {/* Quick buttons */}
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              {[15, 20, 25, 30].map(count => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => handleStudentsCountChange(count)}
+                  className={`py-2 rounded-xl text-xs font-bold transition border ${
+                    initialStudentsCount === count
+                      ? 'bg-amber-500 text-white border-amber-400 shadow-md shadow-amber-500/25'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  }`}
+                >
+                  {count} Siswa
+                </button>
+              ))}
+            </div>
+
+            {/* Custom slider */}
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="5"
+                max="50"
+                step="1"
+                value={initialStudentsCount}
+                onChange={(e) => handleStudentsCountChange(parseInt(e.target.value))}
+                className="flex-1 accent-amber-500"
+              />
+              <span className="text-xs font-bold text-slate-300 min-w-[3rem] text-right">
+                {initialStudentsCount} Anak
+              </span>
+            </div>
+          </div>
+
+          {/* Survivor Target / Rule */}
+          <div>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">
+              Target Juara Bertahan
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onUpdateSettings({ ...settings, survivorTarget: 1 })}
+                className={`p-3 rounded-2xl border text-left transition ${
+                  survivorTarget === 1
+                    ? 'bg-amber-950/60 border-amber-500 text-amber-200'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-400'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                  <Trophy size={16} className="text-amber-400" /> 1 Juara Terakhir
+                </div>
+                <p className="text-[11px] mt-1 opacity-80">Bermain sampai tersisa 1 orang</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onUpdateSettings({ ...settings, survivorTarget: 3 })}
+                className={`p-3 rounded-2xl border text-left transition ${
+                  survivorTarget === 3
+                    ? 'bg-amber-950/60 border-amber-500 text-amber-200'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-400'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                  <Sparkles size={16} className="text-sky-400" /> 3 Juara Terakhir
+                </div>
+                <p className="text-[11px] mt-1 opacity-80">Top 3 siswa lolos bersama</p>
+              </button>
+            </div>
+          </div>
+
+          {/* Motion Mode */}
+          <div>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">
+              Gaya Gerak Siswa
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onUpdateSettings({ ...settings, motionMode: 'jump' })}
+                className={`p-3 rounded-2xl border text-left transition ${
+                  motionMode === 'jump'
+                    ? 'bg-sky-950/60 border-sky-500 text-sky-200'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-400'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                  <Flame size={16} className="text-orange-400" /> Lompat Ceria
+                </div>
+                <p className="text-[11px] mt-1 opacity-80">Melompat ke sisi A atau B</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onUpdateSettings({ ...settings, motionMode: 'step' })}
+                className={`p-3 rounded-2xl border text-left transition ${
+                  motionMode === 'step'
+                    ? 'bg-sky-950/60 border-sky-500 text-sky-200'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-400'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                  <Footprints size={16} className="text-emerald-400" /> Langkah Tertib
+                </div>
+                <p className="text-[11px] mt-1 opacity-80">Melangkah tanpa lompatan</p>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Start Game Button (PID Touch target >= 64px) */}
+        <button
+          onClick={onStartCountdown}
+          className="w-full h-16 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:opacity-95 text-white font-black text-xl flex items-center justify-center gap-3 shadow-2xl shadow-emerald-500/30 transition active:scale-[0.98]"
+        >
+          <Play size={24} fill="currentColor" />
+          Mulai Kuis Eliminasi Massal
+        </button>
+      </div>
+    </div>
+  );
+}

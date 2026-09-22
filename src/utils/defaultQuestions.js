@@ -1,0 +1,152 @@
+// Bank Soal Bawaan Siap Pakai untuk Kelas SD (Sesuai Kurikulum Merdeka)
+
+export const DEFAULT_QUESTION_SETS = [
+  {
+    id: 'ipas-sd-4',
+    title: 'IPAS: Bagian Tumbuhan & Ekosistem',
+    subject: 'Ilmu Pengetahuan Alam dan Sosial (IPAS)',
+    grade: 'SD Kelas 4 - 5',
+    timerSeconds: 10,
+    randomizeQuestions: true,
+    shuffleChoices: false,
+    pointsPerQuestion: 10,
+    questions: [
+      {
+        id: 'q1',
+        text: 'Bagian tumbuhan yang berfungsi menyerap air dan mineral dari dalam tanah adalah...',
+        choiceA: 'Akar',
+        choiceB: 'Daun',
+        correctAnswer: 'A',
+        explanation: 'Akar menyerap air dan mineral nutrisi dari dalam tanah untuk diedarkan ke seluruh tubuh tumbuhan.'
+      },
+      {
+        id: 'q2',
+        text: 'Gas yang diserap daun hijau saat melakukan proses fotosintesis adalah...',
+        choiceA: 'Oksigen (O2)',
+        choiceB: 'Karbon Dioksida (CO2)',
+        correctAnswer: 'B',
+        explanation: 'Tumbuhan hijau menyerap Karbon Dioksida (CO2) dan melepaskan Oksigen (O2) saat fotosintesis di siang hari.'
+      },
+      {
+        id: 'q3',
+        text: 'Hewan pemakan tumbuhan (seperti kambing dan sapi) disebut hewan...',
+        choiceA: 'Herbivora',
+        choiceB: 'Karnivora',
+        correctAnswer: 'A',
+        explanation: 'Herbivora adalah golongan hewan pemakan tumbuhan, sedangkan karnivora adalah pemakan daging.'
+      },
+      {
+        id: 'q4',
+        text: 'Perubahan wujud dari benda cair menjadi padat dinamakan...',
+        choiceA: 'Menguap',
+        choiceB: 'Membeku',
+        correctAnswer: 'B',
+        explanation: 'Membeku adalah perubahan wujud dari zat cair menjadi padat, contohnya air menjadi es batu.'
+      },
+      {
+        id: 'q5',
+        text: 'Proses metamorfosis pada kupu-kupu setelah telur menetas adalah menjadi...',
+        choiceA: 'Ulat (Larva)',
+        choiceB: 'Kepompong (Pupa)',
+        correctAnswer: 'A',
+        explanation: 'Urutan metamorfosis kupu-kupu: Telur -> Ulat (Larva) -> Kepompong (Pupa) -> Kupu-kupu dewasa.'
+      }
+    ]
+  },
+  {
+    id: 'matematika-sd',
+    title: 'Matematika Seru: Hitung Cepat & Logika',
+    subject: 'Matematika',
+    grade: 'SD Kelas 3 - 5',
+    timerSeconds: 8,
+    randomizeQuestions: false,
+    shuffleChoices: false,
+    pointsPerQuestion: 10,
+    questions: [
+      {
+        id: 'mq1',
+        text: 'Hasil dari 15 + 28 adalah...',
+        choiceA: '43',
+        choiceB: '45',
+        correctAnswer: 'A',
+        explanation: '15 + 28 = 43.'
+      },
+      {
+        id: 'mq2',
+        text: 'Berapakah hasil dari perkalian 7 × 8?',
+        choiceA: '54',
+        choiceB: '56',
+        correctAnswer: 'B',
+        explanation: '7 dikali 8 sama dengan 56.'
+      },
+      {
+        id: 'mq3',
+        text: 'Bangun datar yang memiliki 3 sisi dan 3 titik sudut adalah...',
+        choiceA: 'Segitiga',
+        choiceB: 'Segiempat',
+        correctAnswer: 'A',
+        explanation: 'Segitiga memiliki 3 sisi lurus dan 3 titik sudut.'
+      },
+      {
+        id: 'mq4',
+        text: 'Budi punya 40 permen. Dibagikan sama rata kepada 5 temannya. Berapa permen yang diterima tiap anak?',
+        choiceA: '6 permen',
+        choiceB: '8 permen',
+        correctAnswer: 'B',
+        explanation: '40 ÷ 5 = 8 permen untuk masing-masing anak.'
+      },
+      {
+        id: 'mq5',
+        text: 'Manakah nilai yang lebih besar: 1/2 atau 1/4?',
+        choiceA: '1/2',
+        choiceB: '1/4',
+        correctAnswer: 'A',
+        explanation: '1/2 (setengah) lebih besar nilainya daripada 1/4 (seperempat).'
+      }
+    ]
+  },
+  {
+    id: 'pancasila-umum',
+    title: 'Pancasila & Wawasan Kebangsaan Ceria',
+    subject: 'Pendidikan Pancasila',
+    grade: 'SD Semua Kelas',
+    timerSeconds: 10,
+    randomizeQuestions: false,
+    shuffleChoices: false,
+    pointsPerQuestion: 10,
+    questions: [
+      {
+        id: 'pq1',
+        text: 'Lambang sila pertama Pancasila "Ketuhanan Yang Maha Esa" adalah...',
+        choiceA: 'Bintang',
+        choiceB: 'Rantai Emas',
+        correctAnswer: 'A',
+        explanation: 'Bintang bersudut lima berlatar hitam melambangkan sila pertama Pancasila.'
+      },
+      {
+        id: 'pq2',
+        text: 'Semboyan bangsa Indonesia "Bhinneka Tunggal Ika" memiliki arti...',
+        choiceA: 'Maju terus pantang mundur',
+        choiceB: 'Berbeda-beda tetapi tetap satu jua',
+        correctAnswer: 'B',
+        explanation: 'Bhinneka Tunggal Ika artinya walaupun berbeda-beda suku, agama, dan budaya, tetap satu kesatuan bangsa Indonesia.'
+      },
+      {
+        id: 'pq3',
+        text: 'Hari Kemerdekaan Republik Indonesia diperingati setiap tanggal...',
+        choiceA: '17 Agustus',
+        choiceB: '28 Oktober',
+        correctAnswer: 'A',
+        explanation: 'Proklamasi Kemerdekaan Indonesia dikumandangkan pada 17 Agustus 1945.'
+      },
+      {
+        id: 'pq4',
+        text: 'Sikap saling membantu dan bekerja sama membersihkan kelas disebut...',
+        choiceA: 'Gotong Royong',
+        choiceB: 'Mandiri',
+        correctAnswer: 'A',
+        explanation: 'Gotong royong adalah budaya luhur bangsa Indonesia untuk bekerja sama demi kepentingan bersama.'
+      }
+    ]
+  }
+];
