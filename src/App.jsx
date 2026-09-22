@@ -51,7 +51,7 @@ export default function App() {
   // Sound Engine
   const audioSFX = useAudioSFX(settings.soundEnabled);
 
-  // Sync with Vercel KV Serverless API on load
+  // Sync with Vercel KV / API Server on load
   const syncWithVercel = async () => {
     setCloudStatus('syncing');
     try {
@@ -65,6 +65,12 @@ export default function App() {
             saveQuestionSets(merged);
             return merged;
           });
+        } else if (Array.isArray(res.data) && res.data.length === 0) {
+          // If server database is empty, seed it with current local sets
+          const localSets = loadQuestionSets();
+          if (localSets && localSets.length > 0) {
+            uploadAllSetsToVercel(localSets).catch(err => console.warn("Auto seed error", err));
+          }
         }
       } else if (res && res.configured === false) {
         setIsCloudConfigured(false);
@@ -99,26 +105,33 @@ export default function App() {
     isActive: true
   });
 
-  // Save changes to localStorage AND sync to Vercel KV if available
+  // Save changes to localStorage AND sync to online database / API
   const handleUpdateSets = async (newSets, modifiedSet = null, deletedSetId = null) => {
     setSets(newSets);
     saveQuestionSets(newSets);
 
-    if (cloudStatus === 'connected' || isCloudConfigured) {
-      setCloudStatus('syncing');
-      try {
-        if (deletedSetId) {
-          await deleteQuestionSetFromVercel(deletedSetId);
-        } else if (modifiedSet) {
-          await saveQuestionSetToVercel(modifiedSet);
-        } else {
-          await uploadAllSetsToVercel(newSets);
-        }
+    // Sync to API / Database
+    setCloudStatus('syncing');
+    try {
+      let syncSuccess = false;
+      if (deletedSetId) {
+        syncSuccess = await deleteQuestionSetFromVercel(deletedSetId);
+      } else if (modifiedSet) {
+        syncSuccess = await saveQuestionSetToVercel(modifiedSet);
+      } else {
+        const res = await uploadAllSetsToVercel(newSets);
+        syncSuccess = !!(res && res.success);
+      }
+
+      if (syncSuccess !== false) {
+        setIsCloudConfigured(true);
         setCloudStatus('connected');
-      } catch (err) {
-        console.warn("Vercel KV sync failed", err);
+      } else {
         setCloudStatus('offline');
       }
+    } catch (err) {
+      console.warn("Cloud sync failed on update", err);
+      setCloudStatus('offline');
     }
   };
 
